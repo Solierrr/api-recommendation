@@ -1,20 +1,11 @@
-FROM eclipse-temurin:21-jdk AS build
+FROM python:latest
 
 WORKDIR /app
 
-COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
-RUN ./mvnw dependency:go-offline -B
+COPY requirements.txt .
 
-COPY src ./src
-RUN ./mvnw package -DskipTests -B
+RUN pip install --no-cache-dir -r requirements.txt
 
-FROM eclipse-temurin:21-jre
+COPY . .
 
-WORKDIR /app
-
-COPY --from=build /app/target/*.jar app.jar
-
-EXPOSE 8080
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+EXPOSE 8000
