@@ -1,6 +1,17 @@
+import os
 from typing import AsyncGenerator
-from neo4j import AsyncGraphDatabase, AsyncDriver, AsyncSession
+
+import certifi
+from neo4j import AsyncDriver, AsyncGraphDatabase, AsyncSession
+
 from app.config import settings
+
+# Em alguns ambientes (ex: Windows sem a CA raiz atualizada no repositório do
+# sistema), a verificação TLS do driver do Neo4j pode falhar mesmo com um
+# certificado de servidor válido. Apontamos explicitamente para o bundle de
+# CAs confiáveis do certifi, sem desabilitar a verificação do certificado.
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+
 
 class Neo4jService:
     def __init__(self):
