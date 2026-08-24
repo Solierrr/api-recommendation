@@ -1,4 +1,4 @@
-from app.core.weights import WEIGHT_QUALIFICATION, WEIGHT_AVAILABILITY
+from app.core.weights import WEIGHT_QUALIFICATION
 
 class RankingService:
     @staticmethod

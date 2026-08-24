@@ -6,12 +6,12 @@ class RecommendationService:
     def __init__(self, session: AsyncSession):
         self.candidate_service = CandidateService(session)
 
-    async def get_recommendations(self, service_name: str, limit: int = 5) -> list[dict]:
+    async def get_recommendations(self, service_name: str, min_level: int = 2, limit: int = 5) -> list[dict]:
         """
         Pipeline Completo: Busca -> Scoring -> Ordenação -> Top N
         """
         # 1. Recupera o pool pré-filtrado do grafo
-        candidates = await self.candidate_service.fetch_candidate_pool(service_name)
+        candidates = await self.candidate_service.fetch_candidate_pool(service_name, min_level)
         
         # 2. Aplica o cálculo de score e motivos individualmente
         scored_candidates = [

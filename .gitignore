@@ -18,7 +18,35 @@
 *.zip
 *.tar.gz
 *.rar
+*.kiro
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Kiro local config (permissions, cache) - not meant to be shared
+.kiro/
+
+# Documentação interna gerada, não sobe pro repositório
+explicacao.md
