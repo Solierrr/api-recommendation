@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import health, recommendations
+from app.api import events, health, recommendations
 from app.database import neo4j_service
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,9 @@ async def lifespan(app: FastAPI):
     logger.info("Conexão com Neo4j encerrada.")
 
 
-app = FastAPI(title="Motor de Recomendação B2B", lifespan=lifespan)
+app = FastAPI(title="Motor de Recomendação B2B", version="1.0.0", lifespan=lifespan)
 
 # Registrando as rotas da aplicação
 app.include_router(health.router)
 app.include_router(recommendations.router)
+app.include_router(events.router)
