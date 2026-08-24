@@ -1,5 +1,7 @@
 from neo4j import AsyncSession
+
 from app.repositories.candidate_repository import CandidateRepository
+
 
 class CandidateService:
     def __init__(self, session: AsyncSession):

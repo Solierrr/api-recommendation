@@ -1,6 +1,8 @@
 from neo4j import AsyncSession
+
 from app.core.candidate_service import CandidateService
 from app.core.ranking_service import RankingService
+
 
 class RecommendationService:
     def __init__(self, session: AsyncSession):

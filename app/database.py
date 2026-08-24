@@ -1,5 +1,5 @@
 import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import certifi
 from neo4j import AsyncDriver, AsyncGraphDatabase, AsyncSession

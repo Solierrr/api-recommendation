@@ -20,7 +20,10 @@ async def health_check(session: AsyncSession = Depends(neo4j_service.get_session
         if record and record["status"] == 1:
             return {"status": "online", "database": "connected"}
 
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Resposta inesperada do banco")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Resposta inesperada do banco",
+        )
     except HTTPException:
         raise
     except Exception:

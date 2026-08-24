@@ -1,5 +1,6 @@
 from neo4j import AsyncSession
 
+
 class CandidateRepository:
     @staticmethod
     async def find_candidates_by_service(

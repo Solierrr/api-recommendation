@@ -1,5 +1,6 @@
 from app.core.weights import WEIGHT_QUALIFICATION
 
+
 class RankingService:
     @staticmethod
     def calculate_score(candidate: dict) -> dict:
