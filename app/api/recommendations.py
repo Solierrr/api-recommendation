@@ -2,10 +2,15 @@ from fastapi import APIRouter, Depends, status
 from neo4j import AsyncSession
 
 from app.core.recommendation_service import RecommendationService
+from app.core.security import require_api_key
 from app.database import neo4j_service
 from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 
-router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
+router = APIRouter(
+    prefix="/recommendations",
+    tags=["Recommendations"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 @router.post("", response_model=RecommendationResponse, status_code=status.HTTP_200_OK)
