@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, status
 from neo4j import AsyncSession
 
@@ -16,7 +18,7 @@ router = APIRouter(
 @router.post("", response_model=RecommendationResponse, status_code=status.HTTP_200_OK)
 async def get_recommendations(
     payload: RecommendationRequest,
-    session: AsyncSession = Depends(neo4j_service.get_session),
+    session: Annotated[AsyncSession, Depends(neo4j_service.get_session)],
 ):
     service = RecommendationService(session)
     results = await service.get_recommendations(

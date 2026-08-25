@@ -1,4 +1,5 @@
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from neo4j import AsyncSession
@@ -11,7 +12,7 @@ router = APIRouter()
 
 
 @router.get("/health", status_code=status.HTTP_200_OK)
-async def health_check(session: AsyncSession = Depends(neo4j_service.get_session)):
+async def health_check(session: Annotated[AsyncSession, Depends(neo4j_service.get_session)]):
     try:
         # Envia um comando Cypher super leve só para testar a resposta
         result = await session.run("RETURN 1 AS status")
