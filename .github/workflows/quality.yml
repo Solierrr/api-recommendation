@@ -17,18 +17,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
-      - name: Install ruff
-        run: pip install ruff==0.16.4
-
-      - name: Lint
+      - name: Install dependencies
         run: |
-          if [ -f pyproject.toml ]; then
-            ruff check app tests scripts
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
           else
-            # Nesta fase do projeto ainda nao ha config de lint (pyproject.toml) nem
-            # a suite de testes; roda so as checagens de erros reais (F: imports nao
-            # usados, nomes indefinidos etc.), evitando reprovar por estilo antes que
-            # a configuracao de lint completa exista no repositorio.
+            pip install ruff==0.16.4
+          fi
+
+      - name: Lint and format check
+        run: |
+          # Roda o lint/format apenas nos diretorios que ja existem nesta branch.
+          TARGETS="app"
+          [ -d tests ] && TARGETS="$TARGETS tests"
+          [ -d scripts ] && TARGETS="$TARGETS scripts"
+          if [ -f pyproject.toml ]; then
+            ruff check $TARGETS
+            ruff format --check $TARGETS
+          else
+            # Nesta fase do projeto ainda nao ha config de lint/format
+            # (pyproject.toml); roda so as checagens de erro real (F: imports
+            # nao usados, nomes indefinidos etc.), evitando reprovar por estilo
+            # antes que a configuracao completa exista no repositorio.
             ruff check app --isolated --select F
           fi
