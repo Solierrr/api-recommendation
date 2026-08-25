@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from neo4j import AsyncSession
 
@@ -11,7 +13,7 @@ router = APIRouter(prefix="/events", tags=["Telemetry"])
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def track_event(
     payload: EventCreate,
-    session: AsyncSession = Depends(neo4j_service.get_session),
+    session: Annotated[AsyncSession, Depends(neo4j_service.get_session)],
 ):
     service = EventService(session)
     success = await service.register_event(payload)
