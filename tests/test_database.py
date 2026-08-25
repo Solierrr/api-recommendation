@@ -10,9 +10,7 @@ async def test_connect_initializes_driver_and_verifies_connectivity():
     service = Neo4jService()
     fake_driver = AsyncMock()
 
-    with patch(
-        "app.database.AsyncGraphDatabase.driver", return_value=fake_driver
-    ) as mocked_driver_factory:
+    with patch("app.database.AsyncGraphDatabase.driver", return_value=fake_driver) as mocked_driver_factory:
         await service.connect()
 
     mocked_driver_factory.assert_called_once()

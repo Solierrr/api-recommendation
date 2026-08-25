@@ -4,9 +4,7 @@ from tests.fakes import FakeResult, FakeSession
 def test_get_recommendations_requires_api_key(client, override_session):
     override_session(FakeSession(result=FakeResult(data_return=[])))
 
-    response = client.post(
-        "/recommendations", json={"service_name": "Desenvolvimento Python"}
-    )
+    response = client.post("/recommendations", json={"service_name": "Desenvolvimento Python"})
 
     assert response.status_code == 401
 
