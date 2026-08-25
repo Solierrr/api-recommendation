@@ -14,11 +14,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-python@v5
         with:
-          distribution: "temurin"
-          java-version: "21"
-          cache: "maven"
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff==0.16.4
 
       - name: Lint
-        run: ./mvnw org.apache.maven.plugins:maven-checkstyle-plugin:3.6.0:check -Dcheckstyle.config.location=google_checks.xml -Dcheckstyle.violationSeverity=warning -B
+        run: |
+          if [ -f pyproject.toml ]; then
+            ruff check app tests scripts
+          else
+            # Nesta fase do projeto ainda nao ha config de lint (pyproject.toml) nem
+            # a suite de testes; roda so as checagens de erros reais (F: imports nao
+            # usados, nomes indefinidos etc.), evitando reprovar por estilo antes que
+            # a configuracao de lint completa exista no repositorio.
+            ruff check app --isolated --select F
+          fi
