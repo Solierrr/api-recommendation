@@ -8,12 +8,8 @@ class RecommendationRequest(BaseModel):
         description="Nome exato do serviço buscado",
         examples=["Desenvolvimento Python"],
     )
-    min_level: int = Field(
-        default=2, ge=1, le=5, description="Nível mínimo de qualificação"
-    )
-    limit: int = Field(
-        default=5, ge=1, le=20, description="Quantidade máxima de recomendações"
-    )
+    min_level: int = Field(default=2, ge=1, le=5, description="Nível mínimo de qualificação")
+    limit: int = Field(default=5, ge=1, le=20, description="Quantidade máxima de recomendações")
 
 
 class CandidateResponse(BaseModel):

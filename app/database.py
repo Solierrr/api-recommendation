@@ -20,8 +20,7 @@ class Neo4jService:
     async def connect(self):
         """Inicializa o driver Singleton usando as credenciais da nuvem."""
         self._driver = AsyncGraphDatabase.driver(
-            settings.NEO4J_URI,
-            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
+            settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
         )
         await self._driver.verify_connectivity()
 
@@ -36,5 +35,6 @@ class Neo4jService:
             raise RuntimeError("Driver Neo4j não foi inicializado.")
         async with self._driver.session() as session:
             yield session
+
 
 neo4j_service = Neo4jService()

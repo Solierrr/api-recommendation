@@ -35,11 +35,7 @@ def load_statements() -> list[str]:
     raw = SEED_FILE.read_text(encoding="utf-8")
     statements = []
     for chunk in raw.split(";"):
-        lines = [
-            line
-            for line in chunk.splitlines()
-            if line.strip() and not line.strip().startswith("//")
-        ]
+        lines = [line for line in chunk.splitlines() if line.strip() and not line.strip().startswith("//")]
         statement = "\n".join(lines).strip()
         if statement:
             statements.append(statement)

@@ -61,9 +61,7 @@ async def test_get_recommendations_returns_empty_list_when_no_candidates():
     session = object()
     service = RecommendationService(session)
 
-    with patch.object(
-        service.candidate_service, "fetch_candidate_pool", new=AsyncMock(return_value=[])
-    ):
+    with patch.object(service.candidate_service, "fetch_candidate_pool", new=AsyncMock(return_value=[])):
         result = await service.get_recommendations("Serviço Inexistente")
 
     assert result == []
