@@ -24,7 +24,11 @@ jobs:
       - name: Lint
         run: |
           if [ -f pyproject.toml ]; then
-            ruff check app tests scripts
+            # Roda o lint completo apenas nos diretórios que já existem nesta branch.
+            TARGETS="app"
+            [ -d tests ] && TARGETS="$TARGETS tests"
+            [ -d scripts ] && TARGETS="$TARGETS scripts"
+            ruff check $TARGETS
           else
             # Nesta fase do projeto ainda nao ha config de lint (pyproject.toml) nem
             # a suite de testes; roda so as checagens de erros reais (F: imports nao
