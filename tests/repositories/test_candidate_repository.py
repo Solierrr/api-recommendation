@@ -42,9 +42,7 @@ async def test_find_candidates_by_service_passes_correct_query_parameters():
 async def test_find_candidates_by_service_default_min_level_is_one():
     session = FakeSession(result=FakeResult(data_return=[]))
 
-    await CandidateRepository.find_candidates_by_service(
-        session=session, service_name="Serviço X"
-    )
+    await CandidateRepository.find_candidates_by_service(session=session, service_name="Serviço X")
 
     _, params = session.calls[0]
     assert params["min_level"] == 1
