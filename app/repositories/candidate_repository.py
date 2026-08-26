@@ -1,11 +1,10 @@
 from neo4j import AsyncSession
 
+
 class CandidateRepository:
     @staticmethod
     async def find_candidates_by_service(
-        session: AsyncSession, 
-        service_name: str, 
-        min_qualification_level: int = 1
+        session: AsyncSession, service_name: str, min_qualification_level: int = 1
     ) -> list[dict]:
         """
         Executa a busca por travessia no grafo com pré-filtragem rígida.
@@ -22,9 +21,5 @@ class CandidateRepository:
             avg(r.nivel) AS avg_qualification_score
         LIMIT 50
         """
-        result = await session.run(
-            query, 
-            service_name=service_name, 
-            min_level=min_qualification_level
-        )
+        result = await session.run(query, service_name=service_name, min_level=min_qualification_level)
         return await result.data()

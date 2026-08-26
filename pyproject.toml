@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "B008",  # Depends(...) em argumento default é o padrão idiomático do FastAPI
+    "UP042", # str+Enum é mais amplamente compativel que StrEnum (3.11+) e e o padrao usado pelo FastAPI
+]
+
+[tool.coverage.run]
+source = ["app"]
