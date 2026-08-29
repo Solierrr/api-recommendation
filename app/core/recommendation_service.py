@@ -20,6 +20,7 @@ from app.schemas.recommendations import (
 )
 
 
+
 class RecommendationService:
     def __init__(self, session: AsyncSession):
         self.session = session
