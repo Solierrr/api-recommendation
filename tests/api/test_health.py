@@ -63,6 +63,19 @@ def test_health_check_is_public_and_returns_200_when_ready(client, override_heal
     }
 
 
+def test_readiness_returns_fresh_snapshot_metadata(client, override_health):
+    override_health(
+        FakeConnection(),
+        FakeSession(result=FakeResult(single_return=ready_record())),
+    )
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["active_sync_version"] == ready_record()["active_version"]
+    assert response.json()["snapshot_node_count"] == 10
+
+
 def test_health_check_returns_503_when_neo4j_query_fails(client, override_health):
     def _raise(_query, _params):
         raise RuntimeError("connection refused")

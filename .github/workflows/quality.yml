@@ -7,9 +7,14 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      PIP_ONLY_BINARY: ":all:"
 
     steps:
       - uses: actions/checkout@v4
@@ -18,29 +23,24 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+          cache-dependency-path: requirements-ci.lock
 
       - name: Install dependencies
         run: |
-          python -m pip install --only-binary=:all: pip==26.2.1
-          if [ -f requirements-dev.txt ]; then
-            pip install --only-binary=:all: -r requirements-dev.txt
-          else
-            pip install --only-binary=:all: ruff==0.16.4
-          fi
+          python -m pip install pip==26.2.1
+          python -m pip install --require-hashes --requirement requirements-ci.lock
 
-      - name: Lint and format check
-        run: |
-          # Roda o lint/format apenas nos diretorios que ja existem nesta branch.
-          TARGETS="app"
-          [ -d tests ] && TARGETS="$TARGETS tests"
-          [ -d scripts ] && TARGETS="$TARGETS scripts"
-          if [ -f pyproject.toml ]; then
-            ruff check $TARGETS
-            ruff format --check $TARGETS
-          else
-            # Nesta fase do projeto ainda nao ha config de lint/format
-            # (pyproject.toml); roda so as checagens de erro real (F: imports
-            # nao usados, nomes indefinidos etc.), evitando reprovar por estilo
-            # antes que a configuracao completa exista no repositorio.
-            ruff check app --isolated --select F
-          fi
+      - name: Lint
+        run: python -m ruff check app tests
+
+      - name: Format check
+        run: python -m ruff format --check app tests
+
+      - name: Type check
+        run: python -m mypy app
+
+      - name: Static security analysis
+        run: python -m bandit -r app -q
+
+      - name: Dependency vulnerability audit
+        run: python -m pip_audit --require-hashes --requirement requirements.lock

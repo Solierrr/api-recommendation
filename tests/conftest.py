@@ -3,9 +3,12 @@ import os
 # Configura o processo de testes antes de importar app.config, sem depender do
 # .env local ou de credenciais reais.
 os.environ["APP_ENVIRONMENT"] = "test"
+os.environ["APP_TIMEZONE"] = "America/Sao_Paulo"
+os.environ["DOCS_ENABLED"] = "true"
 os.environ["NEO4J_URI"] = "bolt://localhost:7687"
 os.environ["NEO4J_USER"] = "neo4j"
 os.environ["NEO4J_PASSWORD"] = "test-password"
+os.environ.pop("NEO4J_DATABASE", None)
 os.environ["DB_URL"] = "jdbc:postgresql://localhost:5432/test"
 os.environ["DB_USERNAME"] = "test"
 os.environ["DB_PASSWORD"] = "test-password"
@@ -13,6 +16,13 @@ os.environ["DB_SSLMODE"] = "disable"
 os.environ["API_KEY"] = "test-api-key"
 os.environ["SYNC_API_KEY"] = "test-sync-key-with-at-least-32-characters"
 os.environ.pop("RECOMMENDATION_API_KEY", None)
+os.environ["SYNC_ON_STARTUP"] = "false"
+os.environ["SYNC_BATCH_SIZE"] = "500"
+os.environ["SYNC_LOCK_LEASE_SECONDS"] = "900"
+os.environ["SYNC_MIN_DOMAIN_RETENTION_RATIO"] = "0.5"
+os.environ["SNAPSHOT_MAX_AGE_SECONDS"] = "86400"
+os.environ["RECOMMENDATION_RESULT_LIMIT"] = "10"
+os.environ["RECOMMENDATION_POOL_LIMIT"] = "500"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
