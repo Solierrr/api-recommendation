@@ -86,7 +86,8 @@ class RecommendationService:
         )
         if strategy not in {PanelStrategy.NEAREST_AVAILABLE}:
             warnings.append(
-                "Com os dados atuais, esta estratégia valida a unidade, mas classifica o catálogo global elegível."
+                "Com os dados atuais, esta estratégia valida a unidade, "
+                "mas classifica o catálogo global elegível."
             )
         return {
             "context": self._context(
@@ -127,7 +128,8 @@ class RecommendationService:
             ),
             "items": items,
             "warnings": [
-                "Avaliações e experiência são globais por técnico porque o api-core ainda não as relaciona diretamente à profissão."
+                "Avaliações e experiência são globais por técnico porque o "
+                "api-core ainda não as relaciona diretamente à profissão."
             ],
         }
 
