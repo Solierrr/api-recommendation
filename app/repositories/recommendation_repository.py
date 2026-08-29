@@ -186,9 +186,7 @@ class RecommendationRepository:
     async def _many(session: AsyncSession, query: str, **parameters) -> list[dict]:
         result = await session.run(query, **parameters)
         records = await result.data()
-        return [
-            RecommendationRepository._normalize_temporals(dict(row)) for row in records
-        ]
+        return [RecommendationRepository._normalize_temporals(dict(row)) for row in records]
 
     @staticmethod
     def _normalize_temporals(row: dict) -> dict:
@@ -198,10 +196,7 @@ class RecommendationRepository:
         for key, value in list(row.items()):
             if isinstance(value, list):
                 row[key] = [
-                    {
-                        nested_key: native(nested_value)
-                        for nested_key, nested_value in item.items()
-                    }
+                    {nested_key: native(nested_value) for nested_key, nested_value in item.items()}
                     if isinstance(item, dict)
                     else native(item)
                     for item in value
@@ -211,9 +206,7 @@ class RecommendationRepository:
         return row
 
     @classmethod
-    async def get_panel_context(
-        cls, session: AsyncSession, version: str, context_id: str
-    ) -> dict | None:
+    async def get_panel_context(cls, session: AsyncSession, version: str, context_id: str) -> dict | None:
         return await cls._single(
             session,
             cls.PANEL_CONTEXT,
@@ -223,9 +216,7 @@ class RecommendationRepository:
         )
 
     @classmethod
-    async def get_panel_candidates(
-        cls, session: AsyncSession, version: str, pool_limit: int
-    ) -> list[dict]:
+    async def get_panel_candidates(cls, session: AsyncSession, version: str, pool_limit: int) -> list[dict]:
         return await cls._many(
             session,
             cls.PANEL_CANDIDATES,

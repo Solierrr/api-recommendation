@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import health, recommendations, sync
+from app.api import events, health, recommendations, sync
 from app.config import settings
 from app.core.sync_service import SyncService
 from app.database import neo4j_service, postgres_service
@@ -49,5 +49,7 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(events.router)
+app.include_router(recommendations.legacy_router)
 app.include_router(recommendations.router)
 app.include_router(sync.router)

@@ -9,13 +9,9 @@ class RankingService:
         if review_count == 0:
             reasons = ["Profissional ainda não possui avaliações"]
         elif normalized_score >= 0.8:
-            reasons = [
-                f"Excelente avaliação: {average_rating:.1f}/5 em {review_count} avaliação(ões)"
-            ]
+            reasons = [f"Excelente avaliação: {average_rating:.1f}/5 em {review_count} avaliação(ões)"]
         else:
-            reasons = [
-                f"Avaliação média: {average_rating:.1f}/5 em {review_count} avaliação(ões)"
-            ]
+            reasons = [f"Avaliação média: {average_rating:.1f}/5 em {review_count} avaliação(ões)"]
 
         candidate_result = candidate.copy()
         candidate_result["score"] = round(normalized_score, 2)
