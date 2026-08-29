@@ -20,7 +20,6 @@ from app.schemas.recommendations import (
 )
 
 
-
 class RecommendationService:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -60,13 +59,9 @@ class RecommendationService:
             )
         return candidates
 
-    async def recommend_panels(
-        self, local_unit_id: UUID, strategy: PanelStrategy
-    ) -> dict:
+    async def recommend_panels(self, local_unit_id: UUID, strategy: PanelStrategy) -> dict:
         version = await self._active_version()
-        context = await RecommendationRepository.get_panel_context(
-            self.session, version, str(local_unit_id)
-        )
+        context = await RecommendationRepository.get_panel_context(self.session, version, str(local_unit_id))
         if context is None:
             raise ContextNotFoundError(
                 "LOCAL_UNIT_NOT_FOUND",
@@ -91,16 +86,12 @@ class RecommendationService:
                 "mas classifica o catálogo global elegível."
             )
         return {
-            "context": self._context(
-                "local_unit", local_unit_id, strategy.value, version
-            ),
+            "context": self._context("local_unit", local_unit_id, strategy.value, version),
             "items": items,
             "warnings": warnings,
         }
 
-    async def recommend_professionals(
-        self, profession_id: UUID, strategy: ProfessionalStrategy
-    ) -> dict:
+    async def recommend_professionals(self, profession_id: UUID, strategy: ProfessionalStrategy) -> dict:
         version = await self._active_version()
         context = await RecommendationRepository.get_profession_context(
             self.session, version, str(profession_id)
@@ -124,9 +115,7 @@ class RecommendationService:
             settings.RECOMMENDATION_RESULT_LIMIT,
         )
         return {
-            "context": self._context(
-                "profession", profession_id, strategy.value, version
-            ),
+            "context": self._context("profession", profession_id, strategy.value, version),
             "items": items,
             "warnings": [
                 "Avaliações e experiência são globais por técnico porque o "
@@ -134,9 +123,7 @@ class RecommendationService:
             ],
         }
 
-    async def recommend_technicians(
-        self, technical_service_id: UUID, strategy: TechnicianStrategy
-    ) -> dict:
+    async def recommend_technicians(self, technical_service_id: UUID, strategy: TechnicianStrategy) -> dict:
         version = await self._active_version()
         context = await RecommendationRepository.get_technical_service_context(
             self.session, version, str(technical_service_id)
@@ -194,9 +181,7 @@ class RecommendationService:
             service_name,
             min_rating,
         )
-        scored_candidates = [
-            RankingService.calculate_score(candidate) for candidate in candidates
-        ]
+        scored_candidates = [RankingService.calculate_score(candidate) for candidate in candidates]
         ranked_candidates = sorted(
             scored_candidates,
             key=lambda candidate: (

@@ -18,10 +18,7 @@ class GraphSyncRepository:
     DEFAULT_MIN_DOMAIN_RETENTION_RATIO = 0.5
 
     SCHEMA_STATEMENTS = (
-        (
-            "CREATE CONSTRAINT sync_state_source IF NOT EXISTS "
-            "FOR (n:SyncState) REQUIRE n.source IS UNIQUE"
-        ),
+        ("CREATE CONSTRAINT sync_state_source IF NOT EXISTS FOR (n:SyncState) REQUIRE n.source IS UNIQUE"),
         (
             "CREATE CONSTRAINT local_unit_graph_key IF NOT EXISTS "
             "FOR (n:LocalUnit) REQUIRE n.graph_key IS UNIQUE"
@@ -34,10 +31,7 @@ class GraphSyncRepository:
             "CREATE CONSTRAINT solar_model_graph_key IF NOT EXISTS "
             "FOR (n:SolarModel) REQUIRE n.graph_key IS UNIQUE"
         ),
-        (
-            "CREATE CONSTRAINT supplier_graph_key IF NOT EXISTS "
-            "FOR (n:Supplier) REQUIRE n.graph_key IS UNIQUE"
-        ),
+        ("CREATE CONSTRAINT supplier_graph_key IF NOT EXISTS FOR (n:Supplier) REQUIRE n.graph_key IS UNIQUE"),
         (
             "CREATE CONSTRAINT technician_graph_key IF NOT EXISTS "
             "FOR (n:Technician) REQUIRE n.graph_key IS UNIQUE"
@@ -50,10 +44,7 @@ class GraphSyncRepository:
             "CREATE CONSTRAINT affiliation_graph_key IF NOT EXISTS "
             "FOR (n:TechnicianAffiliation) REQUIRE n.graph_key IS UNIQUE"
         ),
-        (
-            "CREATE CONSTRAINT shift_graph_key IF NOT EXISTS "
-            "FOR (n:Shift) REQUIRE n.graph_key IS UNIQUE"
-        ),
+        ("CREATE CONSTRAINT shift_graph_key IF NOT EXISTS FOR (n:Shift) REQUIRE n.graph_key IS UNIQUE"),
         (
             "CREATE CONSTRAINT technical_service_graph_key IF NOT EXISTS "
             "FOR (n:TechnicalService) REQUIRE n.graph_key IS UNIQUE"
@@ -74,10 +65,7 @@ class GraphSyncRepository:
             "CREATE INDEX technical_service_lookup IF NOT EXISTS "
             "FOR (n:TechnicalService) ON (n.source, n.sync_version, n.id)"
         ),
-        (
-            "CREATE INDEX offer_snapshot_lookup IF NOT EXISTS "
-            "FOR (n:SolarOffer) ON (n.source, n.sync_version)"
-        ),
+        ("CREATE INDEX offer_snapshot_lookup IF NOT EXISTS FOR (n:SolarOffer) ON (n.source, n.sync_version)"),
         (
             "CREATE INDEX affiliation_snapshot_lookup IF NOT EXISTS "
             "FOR (n:TechnicianAffiliation) ON "
@@ -509,18 +497,14 @@ class GraphSyncRepository:
                 sync_version=sync_version,
             )
             cleanup_record = await cleanup_result.single()
-            cleanup_versions = (
-                list(cleanup_record["cleanup_versions"] or []) if cleanup_record else []
-            )
+            cleanup_versions = list(cleanup_record["cleanup_versions"] or []) if cleanup_record else []
             await cls._cleanup_snapshot_versions(
                 session,
                 sync_version,
                 cleanup_versions,
             )
         except Exception:
-            logger.exception(
-                "Falha ao recuperar versões órfãs; elas permanecerão pendentes"
-            )
+            logger.exception("Falha ao recuperar versões órfãs; elas permanecerão pendentes")
 
         return record["active_version"]
 
@@ -538,9 +522,7 @@ class GraphSyncRepository:
             lease_seconds=lease_seconds,
         )
         if await result.single() is None:
-            raise UnsafeSnapshotError(
-                "O lock da sincronização foi perdido antes da ativação."
-            )
+            raise UnsafeSnapshotError("O lock da sincronização foi perdido antes da ativação.")
 
     @classmethod
     async def release_lock(cls, session: AsyncSession, sync_version: str) -> None:
@@ -601,9 +583,7 @@ class GraphSyncRepository:
         try:
             await cls.release_lock(session, sync_version)
         except Exception:
-            logger.exception(
-                "Falha ao liberar o lock da sincronização %s", sync_version
-            )
+            logger.exception("Falha ao liberar o lock da sincronização %s", sync_version)
 
     @classmethod
     async def _stage_rows(
@@ -656,8 +636,7 @@ class GraphSyncRepository:
         ]
         if mismatches:
             raise UnsafeSnapshotError(
-                f"Validação de {entity_type} do snapshot falhou: "
-                + "; ".join(mismatches)
+                f"Validação de {entity_type} do snapshot falhou: " + "; ".join(mismatches)
             )
 
     @staticmethod
@@ -669,13 +648,10 @@ class GraphSyncRepository:
         drops = [
             f"{name}: {new_counts.get(name, 0)}/{active_count}"
             for name, active_count in active_counts.items()
-            if active_count > 0
-            and new_counts.get(name, 0) / active_count < minimum_ratio
+            if active_count > 0 and new_counts.get(name, 0) / active_count < minimum_ratio
         ]
         if drops:
-            raise UnsafeSnapshotError(
-                "Snapshot recusado por queda anormal de domínio: " + "; ".join(drops)
-            )
+            raise UnsafeSnapshotError("Snapshot recusado por queda anormal de domínio: " + "; ".join(drops))
 
     @classmethod
     async def complete_sync(
@@ -689,9 +665,7 @@ class GraphSyncRepository:
         min_domain_retention_ratio: float = DEFAULT_MIN_DOMAIN_RETENTION_RATIO,
     ) -> None:
         if active_version and snapshot.expected_node_count == 0:
-            raise UnsafeSnapshotError(
-                "Snapshot vazio recusado porque já existe uma versão ativa."
-            )
+            raise UnsafeSnapshotError("Snapshot vazio recusado porque já existe uma versão ativa.")
 
         if active_version:
             active_counts = await cls._snapshot_counts(
@@ -786,9 +760,7 @@ class GraphSyncRepository:
         if record is None:
             if activation_failure is not None:
                 raise activation_failure
-            raise UnsafeSnapshotError(
-                "O lock da sincronização foi perdido antes da ativação."
-            )
+            raise UnsafeSnapshotError("O lock da sincronização foi perdido antes da ativação.")
 
         cleanup_versions = list(record["cleanup_versions"] or [])
         if cleanup_versions:
@@ -800,8 +772,7 @@ class GraphSyncRepository:
                 )
             except Exception:
                 logger.exception(
-                    "Snapshot ativado, mas a limpeza das versões %s falhou; "
-                    "elas permanecerão pendentes",
+                    "Snapshot ativado, mas a limpeza das versões %s falhou; elas permanecerão pendentes",
                     cleanup_versions,
                 )
 

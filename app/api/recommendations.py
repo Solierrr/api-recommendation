@@ -132,9 +132,7 @@ async def recommend_technicians(
     session: Annotated[AsyncSession, Depends(neo4j_service.get_read_session)],
 ):
     return await _execute_recommendation(
-        RecommendationService(session).recommend_technicians(
-            technical_service_id, strategy
-        )
+        RecommendationService(session).recommend_technicians(technical_service_id, strategy)
     )
 
 

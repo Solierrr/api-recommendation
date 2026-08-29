@@ -28,9 +28,7 @@ class RecommendationEngine:
         origin_latitude_radians = radians(origin_latitude)
         target_latitude_radians = radians(target_latitude)
         haversine = sin(latitude_delta / 2) ** 2 + (
-            cos(origin_latitude_radians)
-            * cos(target_latitude_radians)
-            * sin(longitude_delta / 2) ** 2
+            cos(origin_latitude_radians) * cos(target_latitude_radians) * sin(longitude_delta / 2) ** 2
         )
         return 2 * earth_radius_km * asin(sqrt(haversine))
 
@@ -80,11 +78,7 @@ class RecommendationEngine:
             )
 
         warnings: list[str] = []
-        ranked = [
-            candidate.copy()
-            for candidate in candidates
-            if cls._valid_panel_candidate(candidate)
-        ]
+        ranked = [candidate.copy() for candidate in candidates if cls._valid_panel_candidate(candidate)]
 
         for candidate in ranked:
             candidate["unit_price"] = candidate["unit_price_cents"] / 100.0
@@ -198,13 +192,9 @@ class RecommendationEngine:
                     "weight": candidate["weight"],
                     "unit_price": candidate["unit_price"],
                     "effective_availability": candidate["effective_availability"],
-                    "accepted_proposal_quantity": candidate[
-                        "accepted_proposal_quantity"
-                    ],
+                    "accepted_proposal_quantity": candidate["accepted_proposal_quantity"],
                     "distance_km": (
-                        round(candidate["distance_km"], 3)
-                        if candidate["distance_km"] is not None
-                        else None
+                        round(candidate["distance_km"], 3) if candidate["distance_km"] is not None else None
                     ),
                     "ranking_value": round(float(ranking_value(candidate)), 4),
                     "ranking_unit": ranking_unit,
@@ -217,8 +207,7 @@ class RecommendationEngine:
     def _professional_metrics(cls, candidates: list[dict]) -> list[dict]:
         total_reviews = sum(item["review_count_global"] for item in candidates)
         weighted_ratings = sum(
-            item["average_rating_global"] * item["review_count_global"]
-            for item in candidates
+            item["average_rating_global"] * item["review_count_global"] for item in candidates
         )
         platform_mean = weighted_ratings / total_reviews if total_reviews else 0.0
 
@@ -227,22 +216,14 @@ class RecommendationEngine:
             item = candidate.copy()
             review_count = item["review_count_global"]
             item["adjusted_rating"] = (
-                item["average_rating_global"] * review_count
-                + platform_mean * cls.BAYESIAN_PRIOR_REVIEWS
+                item["average_rating_global"] * review_count + platform_mean * cls.BAYESIAN_PRIOR_REVIEWS
             ) / (review_count + cls.BAYESIAN_PRIOR_REVIEWS)
-            resolved_services = (
-                item["completed_service_count_global"]
-                + item["canceled_service_count_global"]
-            )
+            resolved_services = item["completed_service_count_global"] + item["canceled_service_count_global"]
             item["resolved_service_count"] = resolved_services
             item["completion_rate"] = (
-                item["completed_service_count_global"] / resolved_services
-                if resolved_services
-                else 0.0
+                item["completed_service_count_global"] / resolved_services if resolved_services else 0.0
             )
-            item["reliability_score"] = 0.6 * item["completion_rate"] + 0.4 * (
-                item["adjusted_rating"] / 5.0
-            )
+            item["reliability_score"] = 0.6 * item["completion_rate"] + 0.4 * (item["adjusted_rating"] / 5.0)
             enriched.append(item)
         return enriched
 
@@ -296,9 +277,7 @@ class RecommendationEngine:
             )
             unit = "reliability_score_0_1"
         else:
-            max_certifications = max(
-                (item["valid_certification_count"] for item in ranked), default=0
-            )
+            max_certifications = max((item["valid_certification_count"] for item in ranked), default=0)
             max_experience = max(
                 (item["completed_service_count_global"] for item in ranked),
                 default=0,
@@ -306,14 +285,8 @@ class RecommendationEngine:
             for item in ranked:
                 item["best_match_score"] = (
                     0.4 * (item["adjusted_rating"] / 5.0)
-                    + 0.25
-                    * cls._normalized(
-                        item["valid_certification_count"], max_certifications
-                    )
-                    + 0.2
-                    * cls._normalized(
-                        item["completed_service_count_global"], max_experience
-                    )
+                    + 0.25 * cls._normalized(item["valid_certification_count"], max_certifications)
+                    + 0.2 * cls._normalized(item["completed_service_count_global"], max_experience)
                     + 0.15 * item["reliability_score"]
                 )
             ranked.sort(
@@ -349,10 +322,7 @@ class RecommendationEngine:
                     "válida(s) vinculada(s) à profissão"
                 )
             if strategy is ProfessionalStrategy.MOST_EXPERIENCED:
-                return (
-                    f"{item['completed_service_count_global']} serviço(s) "
-                    "concluído(s) no histórico global"
-                )
+                return f"{item['completed_service_count_global']} serviço(s) concluído(s) no histórico global"
             if strategy is ProfessionalStrategy.MOST_RELIABLE:
                 return (
                     "Taxa global de conclusão de "
@@ -375,15 +345,9 @@ class RecommendationEngine:
                     "profession_id": candidate["profession_id"],
                     "average_rating_global": candidate["average_rating_global"],
                     "review_count_global": candidate["review_count_global"],
-                    "completed_service_count_global": candidate[
-                        "completed_service_count_global"
-                    ],
-                    "assigned_service_count_global": candidate[
-                        "assigned_service_count_global"
-                    ],
-                    "canceled_service_count_global": candidate[
-                        "canceled_service_count_global"
-                    ],
+                    "completed_service_count_global": candidate["completed_service_count_global"],
+                    "assigned_service_count_global": candidate["assigned_service_count_global"],
+                    "canceled_service_count_global": candidate["canceled_service_count_global"],
                     "valid_certification_count": candidate["valid_certification_count"],
                     "certification_names": candidate["certification_names"],
                     "ranking_value": round(float(metric(candidate)), 4),
@@ -394,9 +358,7 @@ class RecommendationEngine:
         return items
 
     @staticmethod
-    def _is_declared_available(
-        shifts: list[dict], scheduled_at: datetime | None, timezone_name: str
-    ) -> bool:
+    def _is_declared_available(shifts: list[dict], scheduled_at: datetime | None, timezone_name: str) -> bool:
         if scheduled_at is None:
             return False
         timezone = ZoneInfo(timezone_name)
@@ -430,10 +392,7 @@ class RecommendationEngine:
                 candidate["shifts"], context["scheduled_at"], timezone_name
             )
             candidate["affiliation_distance_km"] = None
-            if (
-                context["geolocation_count"] == 1
-                and candidate["company_geolocation_count"] == 1
-            ):
+            if context["geolocation_count"] == 1 and candidate["company_geolocation_count"] == 1:
                 candidate["affiliation_distance_km"] = cls._haversine_km(
                     context["latitude"],
                     context["longitude"],
@@ -452,17 +411,14 @@ class RecommendationEngine:
                     "SERVICE_LOCATION_AMBIGUOUS",
                     "A unidade do serviço possui mais de uma geolocalização.",
                 )
-            ranked = [
-                item for item in ranked if item["affiliation_distance_km"] is not None
-            ]
+            ranked = [item for item in ranked if item["affiliation_distance_km"] is not None]
             warnings.append(
                 "A distância usa o endereço da empresa da afiliação como base "
                 "operacional; não representa a localização pessoal do técnico."
             )
 
         if (
-            strategy
-            in {TechnicianStrategy.AVAILABLE, TechnicianStrategy.BEST_ASSIGNMENT}
+            strategy in {TechnicianStrategy.AVAILABLE, TechnicianStrategy.BEST_ASSIGNMENT}
             and context["scheduled_at"] is None
         ):
             raise RecommendationDataUnavailableError(
@@ -510,29 +466,16 @@ class RecommendationEngine:
             )
             unit = "completed_services_with_same_purpose"
         else:
-            max_experience = max(
-                (item["same_purpose_completed_count"] for item in ranked), default=0
-            )
-            max_distance = max(
-                (item["affiliation_distance_km"] for item in ranked), default=0.0
-            )
+            max_experience = max((item["same_purpose_completed_count"] for item in ranked), default=0)
+            max_distance = max((item["affiliation_distance_km"] for item in ranked), default=0.0)
             max_workload = max((item["active_workload"] for item in ranked), default=0)
             for item in ranked:
                 distance_score = (
-                    1.0
-                    if max_distance <= 0
-                    else 1.0 - item["affiliation_distance_km"] / max_distance
+                    1.0 if max_distance <= 0 else 1.0 - item["affiliation_distance_km"] / max_distance
                 )
-                workload_score = (
-                    1.0
-                    if max_workload <= 0
-                    else 1.0 - item["active_workload"] / max_workload
-                )
+                workload_score = 1.0 if max_workload <= 0 else 1.0 - item["active_workload"] / max_workload
                 item["best_assignment_score"] = (
-                    0.25
-                    * cls._normalized(
-                        item["same_purpose_completed_count"], max_experience
-                    )
+                    0.25 * cls._normalized(item["same_purpose_completed_count"], max_experience)
                     + 0.2 * (item["average_rating_global"] / 5.0)
                     + 0.2 * float(item["declared_available_at_schedule"])
                     + 0.2 * distance_score
@@ -560,20 +503,14 @@ class RecommendationEngine:
 
         def reason(item: dict) -> str:
             if strategy is TechnicianStrategy.NEAREST:
-                return (
-                    "Empresa da afiliação a "
-                    f"{item['affiliation_distance_km']:.2f} km da unidade"
-                )
+                return f"Empresa da afiliação a {item['affiliation_distance_km']:.2f} km da unidade"
             if strategy is TechnicianStrategy.AVAILABLE:
                 return (
                     "O horário agendado está contido em um turno declarado; "
                     "conflitos de agenda e deslocamento não são modelados"
                 )
             if strategy is TechnicianStrategy.LEAST_LOADED:
-                return (
-                    f"{item['active_workload']} serviço(s) OPEN/IN_PROGRESS "
-                    "atualmente atribuído(s)"
-                )
+                return f"{item['active_workload']} serviço(s) OPEN/IN_PROGRESS atualmente atribuído(s)"
             if strategy is TechnicianStrategy.MOST_EXPERIENCED:
                 return (
                     "Executou "
@@ -595,15 +532,11 @@ class RecommendationEngine:
                     "name": candidate["name"],
                     "target_service_id": context["id"],
                     "affiliation_type": candidate["affiliation_type"],
-                    "same_purpose_completed_count": candidate[
-                        "same_purpose_completed_count"
-                    ],
+                    "same_purpose_completed_count": candidate["same_purpose_completed_count"],
                     "average_rating_global": candidate["average_rating_global"],
                     "review_count_global": candidate["review_count_global"],
                     "active_workload": candidate["active_workload"],
-                    "declared_available_at_schedule": candidate[
-                        "declared_available_at_schedule"
-                    ],
+                    "declared_available_at_schedule": candidate["declared_available_at_schedule"],
                     "affiliation_distance_km": (
                         round(candidate["affiliation_distance_km"], 3)
                         if candidate["affiliation_distance_km"] is not None

@@ -68,34 +68,23 @@ class Settings(BaseSettings):
         if self.APP_ENVIRONMENT != "production":
             return
         if self.DB_SSLMODE in {"disable", "allow", "prefer"}:
-            raise RuntimeError(
-                "DB_SSLMODE=require ou superior é obrigatório em produção"
-            )
+            raise RuntimeError("DB_SSLMODE=require ou superior é obrigatório em produção")
         if not self.NEO4J_URI.lower().startswith(("neo4j+s://", "bolt+s://")):
-            raise RuntimeError(
-                "NEO4J_URI deve usar neo4j+s:// ou bolt+s:// em produção"
-            )
+            raise RuntimeError("NEO4J_URI deve usar neo4j+s:// ou bolt+s:// em produção")
         if self.DOCS_ENABLED:
             raise RuntimeError("DOCS_ENABLED deve ser false em produção")
         sync_api_key = self.SYNC_API_KEY.get_secret_value() if self.SYNC_API_KEY else ""
         if len(sync_api_key) < 32:
-            raise RuntimeError(
-                "SYNC_API_KEY com pelo menos 32 caracteres é obrigatória em produção"
-            )
+            raise RuntimeError("SYNC_API_KEY com pelo menos 32 caracteres é obrigatória em produção")
         recommendation_api_key = (
-            self.RECOMMENDATION_API_KEY.get_secret_value()
-            if self.RECOMMENDATION_API_KEY
-            else ""
+            self.RECOMMENDATION_API_KEY.get_secret_value() if self.RECOMMENDATION_API_KEY else ""
         )
         if len(recommendation_api_key) < 32:
             raise RuntimeError(
-                "RECOMMENDATION_API_KEY com pelo menos 32 caracteres é "
-                "obrigatória em produção"
+                "RECOMMENDATION_API_KEY com pelo menos 32 caracteres é obrigatória em produção"
             )
         if sync_api_key == recommendation_api_key:
-            raise RuntimeError(
-                "SYNC_API_KEY e RECOMMENDATION_API_KEY devem ser diferentes em produção"
-            )
+            raise RuntimeError("SYNC_API_KEY e RECOMMENDATION_API_KEY devem ser diferentes em produção")
 
 
 @lru_cache

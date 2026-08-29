@@ -43,52 +43,29 @@ class CoreGraphSnapshot:
             "professions": len({row["profession_id"] for row in self.professions}),
             "affiliations": len({row["affiliation_id"] for row in self.affiliations}),
             "shifts": len({row["shift_id"] for row in self.shifts}),
-            "technical_services": len(
-                {row["service_id"] for row in self.technical_services}
-            ),
+            "technical_services": len({row["service_id"] for row in self.technical_services}),
             "service_experiences": len(
-                {
-                    (row["technician_id"], row["normalized_purpose"])
-                    for row in self.service_experiences
-                }
+                {(row["technician_id"], row["normalized_purpose"]) for row in self.service_experiences}
             ),
         }
 
     @property
     def expected_relationship_counts(self) -> dict[str, int]:
         return {
-            "offer_models": len(
-                {(row["offer_id"], row["model_id"]) for row in self.panel_offers}
-            ),
-            "offer_suppliers": len(
-                {(row["offer_id"], row["supplier_id"]) for row in self.panel_offers}
-            ),
+            "offer_models": len({(row["offer_id"], row["model_id"]) for row in self.panel_offers}),
+            "offer_suppliers": len({(row["offer_id"], row["supplier_id"]) for row in self.panel_offers}),
             "registrations": len(
-                {
-                    (row["technician_id"], row["profession_id"])
-                    for row in self.professionals
-                }
+                {(row["technician_id"], row["profession_id"]) for row in self.professionals}
             ),
             "affiliation_technicians": len(
-                {
-                    (row["affiliation_id"], row["technician_id"])
-                    for row in self.affiliations
-                }
+                {(row["affiliation_id"], row["technician_id"]) for row in self.affiliations}
             ),
-            "technician_shifts": len(
-                {(row["technician_id"], row["shift_id"]) for row in self.shifts}
-            ),
+            "technician_shifts": len({(row["technician_id"], row["shift_id"]) for row in self.shifts}),
             "technician_experiences": len(
-                {
-                    (row["technician_id"], row["normalized_purpose"])
-                    for row in self.service_experiences
-                }
+                {(row["technician_id"], row["normalized_purpose"]) for row in self.service_experiences}
             ),
             "assignments": len(
-                {
-                    (row["executor_id"], row["affiliation_id"], row["service_id"])
-                    for row in self.assignments
-                }
+                {(row["executor_id"], row["affiliation_id"], row["service_id"]) for row in self.assignments}
             ),
         }
 
@@ -99,9 +76,7 @@ class CoreGraphSnapshot:
     @property
     def counts(self) -> dict[str, int]:
         certification_names = {
-            name
-            for professional in self.professionals
-            for name in professional["certification_names"]
+            name for professional in self.professionals for name in professional["certification_names"]
         }
         return {
             "local_units": self.expected_node_counts["local_units"],
@@ -542,8 +517,7 @@ class CoreGraphRepository:
         heartbeat: Heartbeat | None = None,
     ) -> CoreGraphSnapshot:
         local_units = [
-            cls._local_unit(row)
-            for row in await cls._fetch(connection, cls.FIND_LOCAL_UNITS, heartbeat)
+            cls._local_unit(row) for row in await cls._fetch(connection, cls.FIND_LOCAL_UNITS, heartbeat)
         ]
 
         panel_offers: list[dict] = []
@@ -553,21 +527,15 @@ class CoreGraphRepository:
                 panel_offers.append(panel_offer)
 
         professions = [
-            cls._profession(row)
-            for row in await cls._fetch(connection, cls.FIND_PROFESSIONS, heartbeat)
+            cls._profession(row) for row in await cls._fetch(connection, cls.FIND_PROFESSIONS, heartbeat)
         ]
         professionals = [
-            cls._professional(row)
-            for row in await cls._fetch(connection, cls.FIND_PROFESSIONALS, heartbeat)
+            cls._professional(row) for row in await cls._fetch(connection, cls.FIND_PROFESSIONALS, heartbeat)
         ]
         affiliations = [
-            cls._affiliation(row)
-            for row in await cls._fetch(connection, cls.FIND_AFFILIATIONS, heartbeat)
+            cls._affiliation(row) for row in await cls._fetch(connection, cls.FIND_AFFILIATIONS, heartbeat)
         ]
-        shifts = [
-            cls._shift(row)
-            for row in await cls._fetch(connection, cls.FIND_SHIFTS, heartbeat)
-        ]
+        shifts = [cls._shift(row) for row in await cls._fetch(connection, cls.FIND_SHIFTS, heartbeat)]
         technical_services = [
             cls._technical_service(row)
             for row in await cls._fetch(
@@ -585,8 +553,7 @@ class CoreGraphRepository:
             )
         ]
         assignments = [
-            cls._assignment(row)
-            for row in await cls._fetch(connection, cls.FIND_ASSIGNMENTS, heartbeat)
+            cls._assignment(row) for row in await cls._fetch(connection, cls.FIND_ASSIGNMENTS, heartbeat)
         ]
         return CoreGraphSnapshot(
             local_units=local_units,
@@ -685,9 +652,7 @@ class CoreGraphRepository:
             "average_rating_global": float(row["average_rating_global"]),
             "review_count_global": int(row["review_count_global"]),
             "assigned_service_count_global": int(row["assigned_service_count_global"]),
-            "completed_service_count_global": int(
-                row["completed_service_count_global"]
-            ),
+            "completed_service_count_global": int(row["completed_service_count_global"]),
             "canceled_service_count_global": int(row["canceled_service_count_global"]),
             "active_workload": int(row["active_workload"]),
             "valid_certification_count": int(row["valid_certification_count"]),
