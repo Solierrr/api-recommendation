@@ -27,6 +27,7 @@ htmlcov/
 tests/
 scripts/
 requirements-dev.txt
+requirements-ci.lock
 pyproject.toml
 sonar-project.properties
 *.md
