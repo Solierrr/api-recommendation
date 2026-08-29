@@ -31,7 +31,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           set +e
-          pytest --cov=app --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml
+          python -m pytest --cov=app --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml
           code=$?
           set -e
           if [ "$code" -eq 5 ]; then

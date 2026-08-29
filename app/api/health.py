@@ -117,11 +117,11 @@ async def liveness_check():
 async def readiness_check(
     connection: Annotated[
         asyncpg.Connection,
-        Depends(get_health_connection, scope="function"),
+        Depends(get_health_connection, scope="function"),  # NOSONAR - supported by FastAPI 0.135.1
     ],
     session: Annotated[
         AsyncSession,
-        Depends(get_health_session, scope="function"),
+        Depends(get_health_session, scope="function"),  # NOSONAR - supported by FastAPI 0.135.1
     ],
 ):
     return await _checked_readiness(connection, session)
@@ -136,11 +136,11 @@ async def readiness_check(
 async def health_check(
     connection: Annotated[
         asyncpg.Connection,
-        Depends(get_health_connection, scope="function"),
+        Depends(get_health_connection, scope="function"),  # NOSONAR - supported by FastAPI 0.135.1
     ],
     session: Annotated[
         AsyncSession,
-        Depends(get_health_session, scope="function"),
+        Depends(get_health_session, scope="function"),  # NOSONAR - supported by FastAPI 0.135.1
     ],
 ):
     await _checked_readiness(connection, session)
