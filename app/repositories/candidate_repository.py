@@ -1,30 +1,42 @@
 from neo4j import AsyncSession
 
+
 class CandidateRepository:
+    SOURCE = "api-core"
+
     @staticmethod
     async def find_candidates_by_service(
-        session: AsyncSession, 
-        service_name: str, 
-        min_qualification_level: int = 1
+        session: AsyncSession,
+        service_name: str,
+        min_rating: float = 0,
+        limit: int = 50,
     ) -> list[dict]:
-        """
-        Executa a busca por travessia no grafo com pré-filtragem rígida.
-        """
         query = """
-        MATCH (p:Profissional)-[:OFERECE_SERVICO]->(s:Servico {nome: $service_name})
-        MATCH (p)-[r:POSSUI_QUALIFICACAO]->(q:Qualificacao)
-        WHERE r.nivel >= $min_level
-        RETURN 
-            p.id AS candidate_id,
-            p.nome AS name,
-            s.nome AS service,
-            collect(q.nome) AS qualifications,
-            avg(r.nivel) AS avg_qualification_score
-        LIMIT 50
+        MATCH (state:SyncState {source: $source})
+        MATCH (professional:Technician {
+            source: $source,
+            sync_version: state.active_version
+        })-[registration:REGISTERED_AS]->(service:Profession {
+            source: $source,
+            sync_version: state.active_version
+        })
+        WHERE toLower(service.name) = toLower($service_name)
+          AND coalesce(professional.average_rating_global, 0.0) >= $min_rating
+        RETURN
+            professional.id AS candidate_id,
+            professional.name AS name,
+            service.name AS service,
+            coalesce(registration.certification_names, []) AS qualifications,
+            coalesce(professional.average_rating_global, 0.0) AS average_rating,
+            coalesce(professional.review_count_global, 0) AS review_count
+        ORDER BY average_rating DESC, review_count DESC, name ASC
+        LIMIT $limit
         """
         result = await session.run(
-            query, 
-            service_name=service_name, 
-            min_level=min_qualification_level
+            query,
+            source=CandidateRepository.SOURCE,
+            service_name=service_name,
+            min_rating=min_rating,
+            limit=limit,
         )
         return await result.data()
