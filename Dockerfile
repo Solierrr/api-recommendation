@@ -1,19 +1,24 @@
 FROM python:3.12-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ONLY_BINARY=:all:
+
 WORKDIR /app
 
-# Instala as dependências antes de copiar o código da aplicação para
-# aproveitar o cache de camadas do Docker (só reinstala quando o
-# requirements.txt muda, não a cada alteração de código).
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN groupadd --system app \
+    && useradd --system --gid app --no-create-home --home-dir /app app
 
-COPY app ./app
+COPY requirements.lock ./requirements.lock
+RUN python -m pip install \
+    --no-cache-dir \
+    --require-hashes \
+    --requirement requirements.lock
 
-# Executa a aplicação com um usuário sem privilégios de root, reduzindo o
-# impacto de uma eventual vulnerabilidade explorada dentro do container.
-RUN useradd --create-home --shell /bin/bash appuser
-USER appuser
+COPY --chown=app:app app ./app
+
+USER app
 
 EXPOSE 8000
 

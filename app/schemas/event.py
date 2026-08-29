@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     VIEW = "VIEW"
     CLICK = "CLICK"
     HIRE = "HIRE"

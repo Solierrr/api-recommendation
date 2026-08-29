@@ -1,56 +1,42 @@
 from app.core.ranking_service import RankingService
-from app.core.weights import WEIGHT_QUALIFICATION
 
 
-def test_calculate_score_high_qualification_adds_excellence_reason():
-    candidate = {"avg_qualification_score": 5.0}
+def test_calculate_score_high_rating_adds_excellence_reason():
+    result = RankingService.calculate_score({"average_rating": 5.0, "review_count": 10})
 
-    result = RankingService.calculate_score(candidate)
-
-    assert result["score"] == round(1.0 * WEIGHT_QUALIFICATION, 2)
-    assert len(result["reasons"]) == 1
-    assert "Excelência técnica" in result["reasons"][0]
+    assert result["score"] == 1.0
+    assert "Excelente avaliação" in result["reasons"][0]
 
 
-def test_calculate_score_minimum_qualification_adds_minimum_reason():
-    candidate = {"avg_qualification_score": 2.0}
+def test_calculate_score_average_rating_is_normalized():
+    result = RankingService.calculate_score({"average_rating": 2.0, "review_count": 3})
 
-    result = RankingService.calculate_score(candidate)
-
-    norm = 2.0 / 5.0
-    assert result["score"] == round(norm * WEIGHT_QUALIFICATION, 2)
-    assert "nível técnico mínimo" in result["reasons"][0]
+    assert result["score"] == 0.4
+    assert "Avaliação média" in result["reasons"][0]
 
 
-def test_calculate_score_zero_qualification_has_no_reasons():
-    candidate = {"avg_qualification_score": 0.0}
-
-    result = RankingService.calculate_score(candidate)
+def test_calculate_score_without_reviews_explains_cold_start():
+    result = RankingService.calculate_score({"average_rating": 0.0, "review_count": 0})
 
     assert result["score"] == 0.0
-    assert result["reasons"] == []
+    assert result["reasons"] == ["Profissional ainda não possui avaliações"]
 
 
-def test_calculate_score_missing_qualification_key_defaults_to_zero():
-    candidate = {}
-
-    result = RankingService.calculate_score(candidate)
+def test_calculate_score_missing_fields_defaults_to_zero():
+    result = RankingService.calculate_score({})
 
     assert result["score"] == 0.0
-    assert result["reasons"] == []
+    assert result["reasons"] == ["Profissional ainda não possui avaliações"]
 
 
 def test_calculate_score_caps_normalized_score_at_one():
-    # Uma nota acima da escala esperada (1-5) não deve gerar score > peso máximo.
-    candidate = {"avg_qualification_score": 10.0}
+    result = RankingService.calculate_score({"average_rating": 10.0, "review_count": 1})
 
-    result = RankingService.calculate_score(candidate)
-
-    assert result["score"] == round(1.0 * WEIGHT_QUALIFICATION, 2)
+    assert result["score"] == 1.0
 
 
 def test_calculate_score_does_not_mutate_input_candidate():
-    candidate = {"avg_qualification_score": 3.0}
+    candidate = {"average_rating": 3.0, "review_count": 2}
 
     RankingService.calculate_score(candidate)
 
@@ -62,7 +48,8 @@ def test_calculate_score_preserves_other_candidate_fields():
     candidate = {
         "candidate_id": "prof_1",
         "name": "Ana Silva",
-        "avg_qualification_score": 4.0,
+        "average_rating": 4.0,
+        "review_count": 5,
     }
 
     result = RankingService.calculate_score(candidate)
