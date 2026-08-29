@@ -25,9 +25,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --only-binary=:all: pip==26.2.1
-          python -m pip install --only-binary=:all: \
-            -r requirements.txt \
-            -r requirements-dev.txt
+          # Todos os requisitos usam pins exatos e o pip-audit é bloqueante.
+          python -m pip install --only-binary=:all: -r requirements.txt -r requirements-dev.txt  # NOSONAR
 
       - name: Lint
         run: python -m ruff check app tests

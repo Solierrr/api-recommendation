@@ -115,10 +115,6 @@ async def test_snapshot_loader_renews_lease_after_every_source_query() -> None:
 
 
 def test_inactive_affiliation_assignments_keep_technician_identity_in_graph() -> None:
-    assert "technician_affiliation.active IS TRUE" not in (
-        CoreGraphRepository.FIND_AFFILIATIONS
-    )
-    assert "technician_affiliation.active IS TRUE" not in (
-        CoreGraphRepository.FIND_ASSIGNMENTS
-    )
+    assert "technician_affiliation.active IS TRUE" not in (CoreGraphRepository.FIND_AFFILIATIONS)
+    assert "technician_affiliation.active IS TRUE" not in (CoreGraphRepository.FIND_ASSIGNMENTS)
     assert "WHERE users.active IS TRUE" in CoreGraphRepository.FIND_ASSIGNMENTS

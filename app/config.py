@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -96,8 +97,9 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    # BaseSettings preenche os campos obrigatórios a partir do ambiente em runtime.
-    return Settings()  # type: ignore[call-arg]
+    # Testes recebem configuração explícita e nunca consultam o dotenv local.
+    env_file = None if os.environ.get("APP_ENVIRONMENT") == "test" else ".env"
+    return Settings(_env_file=env_file)  # type: ignore[call-arg]
 
 
 settings = get_settings()

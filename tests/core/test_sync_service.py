@@ -117,7 +117,9 @@ async def test_extraction_failure_aborts_sync(monkeypatch) -> None:
         classmethod(load_snapshot),
     )
 
+    service = SyncService(FakePostgres(events), object())
+
     with pytest.raises(RuntimeError, match="falha de leitura"):
-        await SyncService(FakePostgres(events), object()).synchronize()
+        await service.synchronize()
 
     assert events == ["lock", "postgres_enter", "postgres_exit", "abort"]

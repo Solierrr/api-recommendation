@@ -67,12 +67,8 @@ class FakeSession:
         self.renew_succeeds = renew_succeeds
         self.node_counts = node_counts or {key: 0 for key in NODE_KEYS}
         self.active_node_counts = active_node_counts or {key: 0 for key in NODE_KEYS}
-        self.relationship_counts = relationship_counts or {
-            key: 0 for key in RELATIONSHIP_KEYS
-        }
-        self.active_relationship_counts = active_relationship_counts or {
-            key: 0 for key in RELATIONSHIP_KEYS
-        }
+        self.relationship_counts = relationship_counts or {key: 0 for key in RELATIONSHIP_KEYS}
+        self.active_relationship_counts = active_relationship_counts or {key: 0 for key in RELATIONSHIP_KEYS}
         self.pending_cleanup_versions = list(pending_cleanup_versions or [])
         self.unreferenced_versions = list(unreferenced_versions or [])
         self.activation_ack_lost = activation_ack_lost
@@ -90,12 +86,8 @@ class FakeSession:
             self.lock_token = parameters["sync_version"]
             return FakeResult({"active_version": self.active_version, "lock_fence": 1})
         if query == GraphSyncRepository.RENEW_LOCK:
-            succeeds = (
-                self.renew_succeeds and self.lock_token == parameters["sync_version"]
-            )
-            return FakeResult(
-                {"lock_token": parameters["sync_version"]} if succeeds else None
-            )
+            succeeds = self.renew_succeeds and self.lock_token == parameters["sync_version"]
+            return FakeResult({"lock_token": parameters["sync_version"]} if succeeds else None)
         if query == GraphSyncRepository.RELEASE_LOCK:
             if self.lock_token == parameters["sync_version"]:
                 self.lock_token = None
@@ -118,24 +110,18 @@ class FakeSession:
             for version in self.unreferenced_versions:
                 if version not in self.pending_cleanup_versions:
                     self.pending_cleanup_versions.append(version)
-            return FakeResult(
-                {"cleanup_versions": self.pending_cleanup_versions.copy()}
-            )
+            return FakeResult({"cleanup_versions": self.pending_cleanup_versions.copy()})
         if query == GraphSyncRepository.REGISTER_CLEANUP_VERSION:
             cleanup_version = parameters["cleanup_version"]
             if cleanup_version in {self.active_version, self.previous_version}:
                 return FakeResult(None)
             if cleanup_version not in self.pending_cleanup_versions:
                 self.pending_cleanup_versions.append(cleanup_version)
-            return FakeResult(
-                {"cleanup_versions": self.pending_cleanup_versions.copy()}
-            )
+            return FakeResult({"cleanup_versions": self.pending_cleanup_versions.copy()})
         if query == GraphSyncRepository.CLEAR_CLEANUP_VERSIONS:
             cleared = set(parameters["cleanup_versions"])
             self.pending_cleanup_versions = [
-                version
-                for version in self.pending_cleanup_versions
-                if version not in cleared
+                version for version in self.pending_cleanup_versions if version not in cleared
             ]
             return FakeResult()
         if query == GraphSyncRepository.ACTIVATE_SNAPSHOT:
@@ -149,11 +135,7 @@ class FakeSession:
                 "previous_version": self.previous_version,
                 "cleanup_versions": self.pending_cleanup_versions.copy(),
             }
-            error = (
-                RuntimeError("ack de ativação perdido")
-                if self.activation_ack_lost
-                else None
-            )
+            error = RuntimeError("ack de ativação perdido") if self.activation_ack_lost else None
             return FakeResult(record, error)
         if query == GraphSyncRepository.RECONCILE_ACTIVATION:
             if (
@@ -205,66 +187,48 @@ def local_unit_snapshot(count: int = 1) -> CoreGraphSnapshot:
 @pytest.mark.asyncio
 async def test_sync_lock_blocks_concurrent_run() -> None:
     session = FakeSession(lock_acquired=False)
+    snapshot = empty_snapshot()
 
     with pytest.raises(SyncInProgressError):
-        await GraphSyncRepository.stage_and_activate(
-            session, empty_snapshot(), "new-version"
-        )
+        await GraphSyncRepository.stage_and_activate(session, snapshot, "new-version")
 
 
 @pytest.mark.asyncio
 async def test_empty_snapshot_cannot_replace_active_version() -> None:
     session = FakeSession(active_version="active-version")
+    snapshot = empty_snapshot()
 
     with pytest.raises(UnsafeSnapshotError, match="Snapshot vazio"):
-        await GraphSyncRepository.stage_and_activate(
-            session, empty_snapshot(), "new-version"
-        )
+        await GraphSyncRepository.stage_and_activate(session, snapshot, "new-version")
 
-    assert any(
-        query == GraphSyncRepository.REGISTER_CLEANUP_VERSION
-        for query, _ in session.queries
-    )
-    assert any(
-        query == GraphSyncRepository.DELETE_SNAPSHOT_VERSIONS
-        for query, _ in session.queries
-    )
-    assert not any(
-        query == GraphSyncRepository.ACTIVATE_SNAPSHOT for query, _ in session.queries
-    )
+    assert any(query == GraphSyncRepository.REGISTER_CLEANUP_VERSION for query, _ in session.queries)
+    assert any(query == GraphSyncRepository.DELETE_SNAPSHOT_VERSIONS for query, _ in session.queries)
+    assert not any(query == GraphSyncRepository.ACTIVATE_SNAPSHOT for query, _ in session.queries)
 
 
 @pytest.mark.asyncio
 async def test_initial_empty_snapshot_is_allowed() -> None:
     session = FakeSession(active_version=None)
 
-    await GraphSyncRepository.stage_and_activate(
-        session, empty_snapshot(), "first-version"
-    )
+    await GraphSyncRepository.stage_and_activate(session, empty_snapshot(), "first-version")
 
-    assert any(
-        query == GraphSyncRepository.ACTIVATE_SNAPSHOT for query, _ in session.queries
-    )
+    assert any(query == GraphSyncRepository.ACTIVATE_SNAPSHOT for query, _ in session.queries)
 
 
 @pytest.mark.asyncio
 async def test_mismatched_node_count_prevents_activation_and_discards_staging() -> None:
     session = FakeSession(node_counts={key: 0 for key in NODE_KEYS})
+    snapshot = local_unit_snapshot()
 
     with pytest.raises(UnsafeSnapshotError, match="Validação de nós"):
         await GraphSyncRepository.stage_and_activate(
             session,
-            local_unit_snapshot(),
+            snapshot,
             "new-version",
         )
 
-    assert not any(
-        query == GraphSyncRepository.ACTIVATE_SNAPSHOT for query, _ in session.queries
-    )
-    assert any(
-        query == GraphSyncRepository.DELETE_SNAPSHOT_VERSIONS
-        for query, _ in session.queries
-    )
+    assert not any(query == GraphSyncRepository.ACTIVATE_SNAPSHOT for query, _ in session.queries)
+    assert any(query == GraphSyncRepository.DELETE_SNAPSHOT_VERSIONS for query, _ in session.queries)
 
 
 @pytest.mark.asyncio
@@ -277,11 +241,12 @@ async def test_mismatched_relationship_count_prevents_activation() -> None:
         node_counts=node_counts,
         relationship_counts=relationship_counts,
     )
+    snapshot = local_unit_snapshot()
 
     with pytest.raises(UnsafeSnapshotError, match="Validação de relações"):
         await GraphSyncRepository.stage_and_activate(
             session,
-            local_unit_snapshot(),
+            snapshot,
             "new-version",
         )
 
@@ -294,18 +259,17 @@ async def test_node_domain_drop_is_rejected_before_staging() -> None:
         active_version="active-version",
         active_node_counts=active_counts,
     )
+    snapshot = local_unit_snapshot()
 
     with pytest.raises(UnsafeSnapshotError, match="queda anormal"):
         await GraphSyncRepository.stage_and_activate(
             session,
-            local_unit_snapshot(),
+            snapshot,
             "new-version",
             min_domain_retention_ratio=0.5,
         )
 
-    assert not any(
-        query == GraphSyncRepository.UPSERT_LOCAL_UNITS for query, _ in session.queries
-    )
+    assert not any(query == GraphSyncRepository.UPSERT_LOCAL_UNITS for query, _ in session.queries)
 
 
 @pytest.mark.asyncio
@@ -319,11 +283,12 @@ async def test_relationship_domain_drop_is_rejected_before_staging() -> None:
         active_node_counts=active_node_counts,
         active_relationship_counts=active_relationship_counts,
     )
+    snapshot = local_unit_snapshot()
 
     with pytest.raises(UnsafeSnapshotError, match="queda anormal"):
         await GraphSyncRepository.stage_and_activate(
             session,
-            local_unit_snapshot(),
+            snapshot,
             "new-version",
             min_domain_retention_ratio=0.5,
         )
@@ -383,10 +348,7 @@ async def test_cleanup_failure_stays_registered_for_future_retry() -> None:
     )
 
     assert session.pending_cleanup_versions == ["older-version"]
-    assert not any(
-        query == GraphSyncRepository.CLEAR_CLEANUP_VERSIONS
-        for query, _ in session.queries
-    )
+    assert not any(query == GraphSyncRepository.CLEAR_CLEANUP_VERSIONS for query, _ in session.queries)
 
 
 @pytest.mark.asyncio
@@ -405,14 +367,8 @@ async def test_lost_activation_ack_is_reconciled_safely() -> None:
     )
 
     assert session.active_version == "new-version"
-    assert any(
-        query == GraphSyncRepository.RECONCILE_ACTIVATION
-        for query, _ in session.queries
-    )
-    assert not any(
-        query == GraphSyncRepository.REGISTER_CLEANUP_VERSION
-        for query, _ in session.queries
-    )
+    assert any(query == GraphSyncRepository.RECONCILE_ACTIVATION for query, _ in session.queries)
+    assert not any(query == GraphSyncRepository.REGISTER_CLEANUP_VERSION for query, _ in session.queries)
 
 
 @pytest.mark.asyncio
@@ -425,20 +381,18 @@ async def test_abort_never_deletes_active_or_previous_snapshot() -> None:
 
     await GraphSyncRepository.abort_sync(session, "active-version")
 
-    assert not any(
-        query == GraphSyncRepository.DELETE_SNAPSHOT_VERSIONS
-        for query, _ in session.queries
-    )
+    assert not any(query == GraphSyncRepository.DELETE_SNAPSHOT_VERSIONS for query, _ in session.queries)
 
 
 @pytest.mark.asyncio
 async def test_staging_failure_discards_only_own_version() -> None:
     session = FakeSession(fail_query=GraphSyncRepository.UPSERT_LOCAL_UNITS)
+    snapshot = local_unit_snapshot()
 
     with pytest.raises(RuntimeError, match="falha simulada"):
         await GraphSyncRepository.stage_and_activate(
             session,
-            local_unit_snapshot(),
+            snapshot,
             "failed-version",
         )
 
@@ -453,12 +407,8 @@ async def test_staging_failure_discards_only_own_version() -> None:
 def test_lock_query_serializes_check_with_monotonic_fence() -> None:
     query = GraphSyncRepository.ACQUIRE_LOCK
 
-    fence_position = query.index(
-        "SET state.lock_fence = coalesce(state.lock_fence, 0) + 1"
-    )
-    availability_check_position = query.index(
-        "WHERE coalesce(state.sync_in_progress, false) = false"
-    )
+    fence_position = query.index("SET state.lock_fence = coalesce(state.lock_fence, 0) + 1")
+    availability_check_position = query.index("WHERE coalesce(state.sync_in_progress, false) = false")
     assert fence_position < availability_check_position
 
 

@@ -92,11 +92,13 @@ def test_best_value_uses_price_per_watt() -> None:
 
 
 def test_nearest_panel_rejects_ambiguous_unit_geolocation() -> None:
+    candidate = panel_candidate()
+
     with pytest.raises(RecommendationDataUnavailableError) as error:
         RecommendationEngine.rank_panels(
             PanelStrategy.NEAREST_AVAILABLE,
             {"geolocation_count": 2, "latitude": None, "longitude": None},
-            [panel_candidate()],
+            [candidate],
             limit=10,
         )
 
@@ -104,11 +106,13 @@ def test_nearest_panel_rejects_ambiguous_unit_geolocation() -> None:
 
 
 def test_target_power_does_not_invent_energy_calculation() -> None:
+    candidate = panel_candidate()
+
     with pytest.raises(RecommendationDataUnavailableError) as error:
         RecommendationEngine.rank_panels(
             PanelStrategy.TARGET_POWER,
             {"geolocation_count": 0, "latitude": None, "longitude": None},
-            [panel_candidate()],
+            [candidate],
             limit=10,
         )
 

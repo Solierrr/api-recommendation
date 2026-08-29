@@ -18,9 +18,10 @@ def production_settings(**overrides) -> Settings:
         "DB_SSLMODE": "require",
         "SYNC_API_KEY": SecretStr("a" * 32),
         "RECOMMENDATION_API_KEY": SecretStr("b" * 32),
+        "API_KEY": SecretStr("c" * 32),
     }
     values.update(overrides)
-    return Settings(**values)
+    return Settings(_env_file=None, **values)
 
 
 def test_production_rejects_unencrypted_postgres() -> None:

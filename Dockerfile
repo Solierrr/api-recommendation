@@ -10,7 +10,8 @@ RUN groupadd --system app \
     && useradd --system --gid app --no-create-home --home-dir /app app
 
 COPY requirements.txt ./requirements.txt
-RUN python -m pip install --no-cache-dir --requirement requirements.txt
+# As dependências diretas usam pins exatos e são auditadas no gate de qualidade.
+RUN python -m pip install --no-cache-dir --requirement requirements.txt  # NOSONAR
 
 COPY --chown=app:app app ./app
 
