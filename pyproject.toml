@@ -9,5 +9,9 @@ ignore = [
     "UP042", # str+Enum é mais amplamente compativel que StrEnum (3.11+) e e o padrao usado pelo FastAPI
 ]
 
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
 [tool.coverage.run]
 source = ["app"]

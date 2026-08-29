@@ -15,7 +15,9 @@ from app.core.errors import (
     SnapshotUnavailableError,
 )
 from app.core.recommendation_service import RecommendationService
+from app.core.security import require_api_key
 from app.database import neo4j_service
+from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from app.schemas.recommendations import (
     PanelRecommendationResponse,
     PanelStrategy,
@@ -63,6 +65,10 @@ router = APIRouter(
     tags=["recommendations"],
     dependencies=[Depends(require_recommendation_key)],
 )
+legacy_router = APIRouter(
+    tags=["recommendations"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 async def _execute_recommendation(operation: Awaitable[Any]) -> Any:
@@ -92,6 +98,46 @@ async def _execute_recommendation(operation: Awaitable[Any]) -> Any:
                 "message": "Não foi possível gerar a recomendação.",
             },
         ) from None
+
+
+def _legacy_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "candidate_id": str(candidate["candidate_id"]),
+        "name": candidate["name"],
+        "service": candidate["service"],
+        "qualifications": candidate["qualifications"],
+        "avg_qualification_score": candidate["average_rating"],
+        "score": candidate["score"],
+        "reasons": candidate["reasons"],
+    }
+
+
+@legacy_router.post(
+    "/recommendations",
+    response_model=RecommendationResponse,
+    deprecated=True,
+    operation_id="get_recommendations_recommendations_post",
+)
+async def legacy_recommendations(
+    payload: RecommendationRequest,
+    session: Annotated[AsyncSession, Depends(neo4j_service.get_read_session)],
+):
+    service_name = payload.service_name.strip()
+    if not service_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Nome do serviço não pode ser vazio",
+        )
+
+    candidates = await _execute_recommendation(
+        RecommendationService(session).get_recommendations(
+            service_name,
+            min_rating=payload.resolved_min_rating,
+            limit=payload.limit,
+        )
+    )
+    data = [_legacy_candidate(candidate) for candidate in candidates]
+    return {"total": len(data), "data": data}
 
 
 @router.get(

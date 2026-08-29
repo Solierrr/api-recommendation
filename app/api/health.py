@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncGenerator
 from typing import Annotated
 
 import asyncpg
@@ -13,6 +14,37 @@ from app.schemas.responses import HealthResponse, LivenessResponse, ReadinessRes
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
+
+_UNAVAILABLE_DETAIL = "Serviço indisponível: dependência ou snapshot não está pronto"
+
+
+async def get_health_connection() -> AsyncGenerator[asyncpg.Connection, None]:
+    try:
+        async with postgres_service.connection() as connection:
+            yield connection
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Falha no ciclo de vida da conexão PostgreSQL do health check")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_UNAVAILABLE_DETAIL,
+        ) from None
+
+
+async def get_health_session() -> AsyncGenerator[AsyncSession, None]:
+    try:
+        async with neo4j_service.read_session() as session:
+            yield session
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Falha no ciclo de vida da sessão Neo4j do health check")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_UNAVAILABLE_DETAIL,
+        ) from None
+
 
 READINESS_QUERY = """
     MATCH (state:SyncState {source: $source})
@@ -72,7 +104,7 @@ async def _checked_readiness(
         logger.exception("Falha no readiness check")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Serviço indisponível: dependência ou snapshot não está pronto",
+            detail=_UNAVAILABLE_DETAIL,
         ) from None
 
 
@@ -83,8 +115,14 @@ async def liveness_check():
 
 @router.get("/health/ready", response_model=ReadinessResponse)
 async def readiness_check(
-    connection: Annotated[asyncpg.Connection, Depends(postgres_service.get_connection)],
-    session: Annotated[AsyncSession, Depends(neo4j_service.get_read_session)],
+    connection: Annotated[
+        asyncpg.Connection,
+        Depends(get_health_connection, scope="function"),
+    ],
+    session: Annotated[
+        AsyncSession,
+        Depends(get_health_session, scope="function"),
+    ],
 ):
     return await _checked_readiness(connection, session)
 
@@ -96,8 +134,14 @@ async def readiness_check(
     deprecated=True,
 )
 async def health_check(
-    connection: Annotated[asyncpg.Connection, Depends(postgres_service.get_connection)],
-    session: Annotated[AsyncSession, Depends(neo4j_service.get_read_session)],
+    connection: Annotated[
+        asyncpg.Connection,
+        Depends(get_health_connection, scope="function"),
+    ],
+    session: Annotated[
+        AsyncSession,
+        Depends(get_health_session, scope="function"),
+    ],
 ):
     await _checked_readiness(connection, session)
     return {

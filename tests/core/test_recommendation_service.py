@@ -5,15 +5,21 @@ import pytest
 from app.core.recommendation_service import RecommendationService
 
 
+def candidate(candidate_id: str, rating: float, reviews: int) -> dict:
+    return {
+        "candidate_id": candidate_id,
+        "average_rating": rating,
+        "review_count": reviews,
+    }
+
+
 @pytest.mark.asyncio
 async def test_get_recommendations_orders_by_score_descending():
-    session = object()
-    service = RecommendationService(session)
-
+    service = RecommendationService(object())
     candidates = [
-        {"candidate_id": "prof_low", "avg_qualification_score": 2.0},
-        {"candidate_id": "prof_high", "avg_qualification_score": 5.0},
-        {"candidate_id": "prof_mid", "avg_qualification_score": 3.5},
+        candidate("prof_low", 2.0, 5),
+        candidate("prof_high", 5.0, 2),
+        candidate("prof_mid", 3.5, 9),
     ]
 
     with patch.object(
@@ -23,16 +29,32 @@ async def test_get_recommendations_orders_by_score_descending():
     ):
         result = await service.get_recommendations("Desenvolvimento Python")
 
-    ids_in_order = [c["candidate_id"] for c in result]
-    assert ids_in_order == ["prof_high", "prof_mid", "prof_low"]
+    assert [item["candidate_id"] for item in result] == [
+        "prof_high",
+        "prof_mid",
+        "prof_low",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_recommendations_uses_review_count_as_tiebreaker():
+    service = RecommendationService(object())
+    candidates = [candidate("few", 4.0, 2), candidate("many", 4.0, 20)]
+
+    with patch.object(
+        service.candidate_service,
+        "fetch_candidate_pool",
+        new=AsyncMock(return_value=candidates),
+    ):
+        result = await service.get_recommendations("Serviço X")
+
+    assert [item["candidate_id"] for item in result] == ["many", "few"]
 
 
 @pytest.mark.asyncio
 async def test_get_recommendations_respects_limit():
-    session = object()
-    service = RecommendationService(session)
-
-    candidates = [{"avg_qualification_score": float(i)} for i in range(1, 6)]
+    service = RecommendationService(object())
+    candidates = [candidate(str(index), float(index), index) for index in range(1, 6)]
 
     with patch.object(
         service.candidate_service,
@@ -45,23 +67,25 @@ async def test_get_recommendations_respects_limit():
 
 
 @pytest.mark.asyncio
-async def test_get_recommendations_propagates_min_level_to_candidate_service():
-    session = object()
-    service = RecommendationService(session)
-
+async def test_get_recommendations_propagates_min_rating_to_candidate_service():
+    service = RecommendationService(object())
     mocked = AsyncMock(return_value=[])
-    with patch.object(service.candidate_service, "fetch_candidate_pool", new=mocked):
-        await service.get_recommendations("Serviço X", min_level=4, limit=10)
 
-    mocked.assert_awaited_once_with("Serviço X", 4)
+    with patch.object(service.candidate_service, "fetch_candidate_pool", new=mocked):
+        await service.get_recommendations("Serviço X", min_rating=4.0, limit=10)
+
+    mocked.assert_awaited_once_with("Serviço X", 4.0)
 
 
 @pytest.mark.asyncio
 async def test_get_recommendations_returns_empty_list_when_no_candidates():
-    session = object()
-    service = RecommendationService(session)
+    service = RecommendationService(object())
 
-    with patch.object(service.candidate_service, "fetch_candidate_pool", new=AsyncMock(return_value=[])):
+    with patch.object(
+        service.candidate_service,
+        "fetch_candidate_pool",
+        new=AsyncMock(return_value=[]),
+    ):
         result = await service.get_recommendations("Serviço Inexistente")
 
     assert result == []
