@@ -29,15 +29,6 @@ qualificações) ficam modelados como um grafo no Neo4j.
    python -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-3. (Opcional) Popule o banco com uma massa de dados de teste:
-
-   ```bash
-   python scripts/seed.py
-   ```
-
-   **Atenção:** este script apaga todos os dados existentes no banco configurado antes de
-   recriar a massa de teste. Use apenas em bancos de desenvolvimento.
-
 4. Suba a API:
 
    ```bash
@@ -112,11 +103,3 @@ scripts/
   seed.py         # Executa o seed.cypher contra o banco configurado
 tests/            # Testes unitários (pytest)
 ```
-
-## Convenções
-
-**Commits** seguem o padrão: `fix:`, `feat:`, `docs:`, `style:`, `refactor:`, `build:`, `test:`,
-`chore:`, `ci:`.
-
-**Branches** seguem o padrão: `feat/`, `fix/`, `docs/`, `style/`, `refactor/`, `build/`, `test/`,
-`chore/`, `ci/`, `hotfix/`, `release/`.
