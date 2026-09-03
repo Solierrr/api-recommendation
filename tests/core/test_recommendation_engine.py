@@ -173,10 +173,12 @@ def test_available_technician_requires_schedule() -> None:
     assert error.value.code == "SERVICE_SCHEDULE_REQUIRED"
 
 
-def test_available_technician_is_filtered_by_declared_shift() -> None:
+def test_available_technician_ignores_shifts_and_keeps_everyone_when_scheduled() -> None:
+    # O api-core não modela turnos de trabalho; por decisão de produto, todo
+    # técnico é considerado disponível quando o serviço tem data agendada.
     schedule = datetime(2026, 4, 10, 14, 0, tzinfo=UTC)
-    available = technician_candidate(schedule)
-    unavailable = technician_candidate(
+    first = technician_candidate(schedule)
+    second = technician_candidate(
         schedule,
         shifts=[
             {
@@ -195,12 +197,15 @@ def test_available_technician_is_filtered_by_declared_shift() -> None:
             "latitude": None,
             "longitude": None,
         },
-        [unavailable, available],
+        [second, first],
         limit=10,
         timezone_name="UTC",
     )
 
-    assert [item["technician_id"] for item in items] == [available["technician_id"]]
+    assert {item["technician_id"] for item in items} == {
+        first["technician_id"],
+        second["technician_id"],
+    }
     assert warnings
 
 
