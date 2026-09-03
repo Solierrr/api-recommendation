@@ -103,3 +103,41 @@ htmlcov/
 
 # Logs
 *.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+replay_pid*
+
+# Visual Studio Code / Cursor
+.cursor/
+
+# Claude Code
+.claude/
+
+# Emacs
+\#*\#
+
+# Test results
+test-results.xml
+
+# Kiro local config (permissões, cache) - não é para ser compartilhado
+.kiro/
+
+# Documentação interna gerada, não sobe pro repositório
+explicacao.md
+arquivos.md
