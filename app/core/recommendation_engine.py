@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from math import asin, cos, isfinite, radians, sin, sqrt
-from zoneinfo import ZoneInfo
 
 from app.core.errors import RecommendationDataUnavailableError
 from app.schemas.recommendations import (
@@ -359,18 +358,10 @@ class RecommendationEngine:
 
     @staticmethod
     def _is_declared_available(shifts: list[dict], scheduled_at: datetime | None, timezone_name: str) -> bool:
-        if scheduled_at is None:
-            return False
-        timezone = ZoneInfo(timezone_name)
-        if scheduled_at.tzinfo is None:
-            local_schedule = scheduled_at
-        else:
-            local_schedule = scheduled_at.astimezone(timezone).replace(tzinfo=None)
-        return any(
-            shift["start_at"] <= local_schedule < shift["end_at"]
-            for shift in shifts
-            if shift.get("start_at") is not None and shift.get("end_at") is not None
-        )
+        # O api-core não modela turnos de trabalho. Por decisão de produto,
+        # todo técnico é considerado disponível quando o serviço tem uma
+        # data agendada; a checagem por turno declarado foi desativada.
+        return scheduled_at is not None
 
     @classmethod
     def rank_technicians(
