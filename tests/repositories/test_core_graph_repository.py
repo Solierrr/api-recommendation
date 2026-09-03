@@ -115,6 +115,7 @@ async def test_snapshot_loader_renews_lease_after_every_source_query() -> None:
 
 
 def test_inactive_affiliation_assignments_keep_technician_identity_in_graph() -> None:
-    assert "technician_affiliation.active IS TRUE" not in (CoreGraphRepository.FIND_AFFILIATIONS)
-    assert "technician_affiliation.active IS TRUE" not in (CoreGraphRepository.FIND_ASSIGNMENTS)
-    assert "WHERE users.active IS TRUE" in CoreGraphRepository.FIND_ASSIGNMENTS
+    # O schema atual não modela afiliação/usuário ativo; todas as afiliações
+    # e usuários são tratados como ativos por decisão de produto.
+    assert "professional_affiliation.active" not in (CoreGraphRepository.FIND_AFFILIATIONS)
+    assert "professional_affiliation.active" not in (CoreGraphRepository.FIND_ASSIGNMENTS)
