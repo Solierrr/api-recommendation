@@ -17,10 +17,12 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: SecretStr
     NEO4J_DATABASE: str | None = None
 
-    DB_URL: str = "jdbc:postgresql://localhost:5432/dbsolier"
-    DB_USERNAME: str = "solier"
-    DB_PASSWORD: SecretStr = SecretStr("solier")
-    DB_SSLMODE: str = "disable"
+    DB_POSTGRES_HOST: str = "localhost"
+    DB_POSTGRES_PORT: int = 5432
+    DB_POSTGRES_CORE: str = "dbsolier"
+    DB_POSTGRES_USER: str = "solier"
+    DB_POSTGRES_PASSWORD: SecretStr = SecretStr("solier")
+    DB_POSTGRES_SSLMODE: str = "disable"
 
     SYNC_API_KEY: SecretStr | None = None
     RECOMMENDATION_API_KEY: SecretStr | None = None
@@ -49,28 +51,25 @@ class Settings(BaseSettings):
             raise ValueError("APP_TIMEZONE deve ser um timezone IANA válido") from error
         return value
 
-    @field_validator("DB_SSLMODE")
+    @field_validator("DB_POSTGRES_SSLMODE")
     @classmethod
     def validate_sslmode(cls, value: str) -> str:
         normalized = value.lower()
         allowed = {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
         if normalized not in allowed:
-            raise ValueError(f"DB_SSLMODE inválido: {value}")
+            raise ValueError(f"DB_POSTGRES_SSLMODE inválido: {value}")
         return normalized
 
     @property
     def postgres_dsn(self) -> str:
-        """Converte a URL JDBC do api-core para uma DSN aceita pelo asyncpg."""
-        dsn = self.DB_URL.removeprefix("jdbc:")
-        if not dsn.startswith(("postgresql://", "postgres://")):
-            raise ValueError("DB_URL deve apontar para PostgreSQL")
-        return dsn
+        """DSN aceita pelo asyncpg, montada a partir do host/porta/banco compartilhados com o api-core."""
+        return f"postgresql://{self.DB_POSTGRES_HOST}:{self.DB_POSTGRES_PORT}/{self.DB_POSTGRES_CORE}"
 
     def validate_runtime_security(self) -> None:
         if self.APP_ENVIRONMENT != "production":
             return
-        if self.DB_SSLMODE in {"disable", "allow", "prefer"}:
-            raise RuntimeError("DB_SSLMODE=require ou superior é obrigatório em produção")
+        if self.DB_POSTGRES_SSLMODE in {"disable", "allow", "prefer"}:
+            raise RuntimeError("DB_POSTGRES_SSLMODE=require ou superior é obrigatório em produção")
         if not self.NEO4J_URI.lower().startswith(("neo4j+s://", "bolt+s://")):
             raise RuntimeError("NEO4J_URI deve usar neo4j+s:// ou bolt+s:// em produção")
         if self.DOCS_ENABLED:

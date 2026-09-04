@@ -34,7 +34,7 @@ async def test_postgres_preserves_configured_sslmode(monkeypatch) -> None:
         captured.update(kwargs)
         return FakePool()
 
-    monkeypatch.setattr(settings, "DB_SSLMODE", "verify-full")
+    monkeypatch.setattr(settings, "DB_POSTGRES_SSLMODE", "verify-full")
     monkeypatch.setattr(database.asyncpg, "create_pool", create_pool)
 
     await PostgresService().connect()
