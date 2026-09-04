@@ -16,7 +16,7 @@ def production_settings(**overrides) -> Settings:
         "NEO4J_URI": "neo4j+s://neo4j.example.com",
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": "production-password",
-        "DB_SSLMODE": "require",
+        "DB_POSTGRES_SSLMODE": "require",
         **VALID_PRODUCTION_KEYS,
     }
     values.update(overrides)
