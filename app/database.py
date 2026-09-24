@@ -21,9 +21,9 @@ class PostgresService:
         """Cria um pool somente leitura para o PostgreSQL usado pelo api-core."""
         self._pool = await asyncpg.create_pool(
             dsn=settings.postgres_dsn,
-            user=settings.DB_USERNAME,
-            password=settings.DB_PASSWORD.get_secret_value(),
-            ssl=settings.DB_SSLMODE,
+            user=settings.DB_POSTGRES_USER,
+            password=settings.DB_POSTGRES_PASSWORD.get_secret_value(),
+            ssl=settings.DB_POSTGRES_SSLMODE,
             min_size=1,
             max_size=5,
             command_timeout=30,

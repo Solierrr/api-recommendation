@@ -1,105 +1,66 @@
 # api-recommendation
 
-Motor de Recomendação B2B: recebe o nome de um serviço e devolve os profissionais mais
-qualificados para executá-lo, com pontuação e justificativa. Os dados (profissionais, serviços,
-qualificações) ficam modelados como um grafo no Neo4j.
+O `api-recommendation` é o motor de recomendação B2B da plataforma: recebe o nome de um serviço
+técnico e devolve os profissionais mais qualificados para executá-lo, com pontuação e justificativa
+para cada candidato. Os dados de profissionais, serviços e qualificações ficam modelados como um
+grafo no Neo4j, o que permite consultas de ranqueamento que combinam afiliação, qualificações e
+histórico de eventos (visualizações, cliques e contratações) de forma muito mais natural do que em
+um modelo relacional. O serviço não é dono desses dados: ele os sincroniza periodicamente a partir
+do PostgreSQL somente leitura do `api-core`, projetando o snapshot relacional em um grafo otimizado
+para consultas de ranqueamento.
 
-## Stack
+<p>
 
-- **Python 3.12** + **FastAPI** (API HTTP assíncrona)
-- **Neo4j** (banco de dados de grafos, via driver assíncrono oficial)
-- **Pydantic** (validação de entrada/saída)
-- **pytest** (testes) + **ruff** (lint) + **SonarQube** (qualidade de código)
-- **Docker** (containerização)
+[![License](https://img.shields.io/github/license/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/blob/main/LICENSE)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/commits)
+[![GitHub Issues](https://img.shields.io/github/issues/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/pulls)
+[![GitHub Contributors](https://img.shields.io/github/contributors/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/graphs/contributors)
+[![Release](https://img.shields.io/github/v/release/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/releases)
 
-## Como rodar localmente
+</p>
 
-1. Crie um ambiente virtual e instale as dependências:
+<div align="center">
 
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate   # Windows
-   pip install -r requirements-dev.txt
-   ```
+<p>
+  <a href="https://github.com/syvixor/skills-icons">
+    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,pydantic,neo4j,postgresql,docker" height="48" alt="Stack do Projeto">
+  </a>
+</p>
 
-2. Copie `.env.example` para `.env` e preencha com as credenciais da sua instância Neo4j
-   (ex: AuraDB) e gere uma API key:
+<p>
 
-   ```bash
-   python -c "import secrets; print(secrets.token_urlsafe(32))"
-   ```
+[![Python](https://img.shields.io/badge/Python_3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Pydantic](https://img.shields.io/badge/Pydantic-E92063?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?logo=neo4j&logoColor=white)](https://neo4j.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
-4. Suba a API:
+</p>
 
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+</div>
 
-5. Acesse a documentação interativa (Swagger) em `http://localhost:8000/docs`.
+- **Recomendação de profissionais**, dado o nome de um serviço técnico, o motor consulta o grafo
+  Neo4j e retorna os candidatos ranqueados por um conjunto de pesos (qualificação, afiliação,
+  histórico de eventos) definidos em `app/core/weights.py`.
+- **Telemetria de eventos**, cada interação relevante (visualização, clique, contratação) de um
+  candidato recomendado é registrada via `POST /events`, alimentando o ranqueamento futuro.
+- **Sincronização com o api-core**, o serviço mantém uma conexão somente leitura com o PostgreSQL
+  do `api-core` e projeta esse estado no grafo Neo4j periodicamente (`SYNC_ON_STARTUP`) ou sob
+  demanda via rota interna autenticada (`POST /internal/sync/core`).
+- **Autenticação por API key**, todas as rotas de negócio exigem uma chave própria (`API_KEY`,
+  `RECOMMENDATION_API_KEY` ou `SYNC_API_KEY`, conforme a rota), comparadas com `hmac.compare_digest`
+  para evitar ataques de timing.
 
-## Como rodar com Docker
+## Aprofunde-se no Projeto!
 
-```bash
-docker build -t api-recommendation .
-docker run --rm -p 8000:8000 --env-file .env api-recommendation
-```
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [RUNNING.md](./RUNNING.md)
+- {link do arquivo de deployment}
 
-## Endpoints
+## Contribuindo
 
-| Método | Rota              | Autenticação    | Descrição                                          |
-|--------|--------------------|-----------------|-----------------------------------------------------|
-| GET    | `/health`          | Nenhuma         | Healthcheck: verifica a conexão com o Neo4j.        |
-| POST   | `/recommendations` | `X-API-Key`     | Retorna os candidatos ranqueados para um serviço.   |
-| POST   | `/events`          | `X-API-Key`     | Registra um evento de telemetria (VIEW/CLICK/HIRE). |
-
-### Autenticação
-
-As rotas `/recommendations` e `/events` exigem o header `X-API-Key` com o valor configurado em
-`API_KEY` no `.env`. Requisições sem a chave ou com uma chave inválida recebem `401 Unauthorized`.
-`/health` é intencionalmente público, para não travar healthchecks de infraestrutura
-(load balancers, orquestradores) que normalmente não enviam credenciais.
-
-### Exemplo: `POST /recommendations`
-
-```bash
-curl -X POST http://localhost:8000/recommendations \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: <sua-api-key>" \
-  -d '{"service_name": "Desenvolvimento Python", "min_level": 2, "limit": 5}'
-```
-
-### Exemplo: `POST /events`
-
-```bash
-curl -X POST http://localhost:8000/events \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: <sua-api-key>" \
-  -d '{"user_id": "empresa_123", "candidate_id": "prof_1", "event_type": "HIRE"}'
-```
-
-## Testes e qualidade
-
-```bash
-pytest --cov=app --cov-report=term-missing   # testes unitários + cobertura
-ruff check app tests scripts                 # lint
-```
-
-O pipeline de CI (`.github/workflows/ci.yml`) roda os testes e gera o relatório de cobertura a
-cada push/PR; `quality.yml` roda o lint; `sonarqube.yml` envia os resultados para o SonarQube.
-
-## Estrutura do projeto
-
-```
-app/
-  api/            # Rotas HTTP (FastAPI routers)
-  core/           # Regras de negócio (services)
-  repositories/   # Acesso ao Neo4j (queries Cypher)
-  schemas/        # Modelos Pydantic de entrada/saída
-  config.py       # Configurações (variáveis de ambiente)
-  database.py     # Gerenciamento da conexão com o Neo4j
-  main.py         # Ponto de entrada da aplicação
-scripts/
-  seed.cypher     # Massa de dados de teste
-  seed.py         # Executa o seed.cypher contra o banco configurado
-tests/            # Testes unitários (pytest)
-```
+- [CONTRIBUTING.md](./CONTRIBUTING.md), convenções de commit, branch e Pull Request.
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), código de conduta do projeto.
+- [SECURITY.md](./SECURITY.md), como reportar vulnerabilidades de segurança.

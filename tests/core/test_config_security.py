@@ -12,10 +12,12 @@ def production_settings(**overrides) -> Settings:
         "NEO4J_URI": "neo4j+s://neo4j.example.com",
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": SecretStr("secret"),
-        "DB_URL": "jdbc:postgresql://db.example.com/recommendation",
-        "DB_USERNAME": "reader",
-        "DB_PASSWORD": SecretStr("secret"),
-        "DB_SSLMODE": "require",
+        "DB_POSTGRES_HOST": "db.example.com",
+        "DB_POSTGRES_PORT": 5432,
+        "DB_POSTGRES_CORE": "recommendation",
+        "DB_POSTGRES_USER": "reader",
+        "DB_POSTGRES_PASSWORD": SecretStr("secret"),
+        "DB_POSTGRES_SSLMODE": "require",
         "SYNC_API_KEY": SecretStr("a" * 32),
         "RECOMMENDATION_API_KEY": SecretStr("b" * 32),
         "API_KEY": SecretStr("c" * 32),
@@ -25,9 +27,9 @@ def production_settings(**overrides) -> Settings:
 
 
 def test_production_rejects_unencrypted_postgres() -> None:
-    configured = production_settings(DB_SSLMODE="disable")
+    configured = production_settings(DB_POSTGRES_SSLMODE="disable")
 
-    with pytest.raises(RuntimeError, match="DB_SSLMODE"):
+    with pytest.raises(RuntimeError, match="DB_POSTGRES_SSLMODE"):
         configured.validate_runtime_security()
 
 
