@@ -1,0 +1,23 @@
+meta {
+  name: GET /recommendations/technicians/services/{{technicalServiceId}}
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/recommendations/technicians/services/{{technicalServiceId}}
+  body: none
+  auth: none
+}
+
+params:query {
+  strategy: nearest
+}
+
+headers {
+  X-Recommendation-Key: {{recommendationKey}}
+}
+
+docs {
+  Read-only recommendation query; technical service ID must exist.
+}
