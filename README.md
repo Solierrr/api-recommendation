@@ -1,13 +1,12 @@
 # api-recommendation
 
-O `api-recommendation` é o motor de recomendação B2B da plataforma: recebe o nome de um serviço
-técnico e devolve os profissionais mais qualificados para executá-lo, com pontuação e justificativa
-para cada candidato. Os dados de profissionais, serviços e qualificações ficam modelados como um
-grafo no Neo4j, o que permite consultas de ranqueamento que combinam afiliação, qualificações e
-histórico de eventos (visualizações, cliques e contratações) de forma muito mais natural do que em
-um modelo relacional. O serviço não é dono desses dados: ele os sincroniza periodicamente a partir
-do PostgreSQL somente leitura do `api-core`, projetando o snapshot relacional em um grafo otimizado
-para consultas de ranqueamento.
+O `api-recommendation` é o motor de feeds da plataforma: recomenda profissionais, ofertas de placas
+solares e fornecedores para as três telas de feed do marketplace. O ranking vem de um grafo no
+Neo4j (`feeddb`), que é uma projeção descartável do PostgreSQL do `api-core`, reconstruída pelo
+job [`database-bootstrap`](https://github.com/Solierrr/database-bootstrap). Este serviço só lê o
+grafo: ele não sincroniza, não escreve e não depende do Neo4j para funcionar. Quando o grafo está
+indisponível, ou não está configurado (como no QA), ele responde com uma amostra dos itens
+elegíveis lida direto do PostgreSQL.
 
 <p>
 
@@ -41,23 +40,25 @@ para consultas de ranqueamento.
 
 </div>
 
-- **Recomendação de profissionais**, dado o nome de um serviço técnico, o motor consulta o grafo
-  Neo4j e retorna os candidatos ranqueados por um conjunto de pesos (qualificação, afiliação,
-  histórico de eventos) definidos em `app/core/weights.py`.
-- **Telemetria de eventos**, cada interação relevante (visualização, clique, contratação) de um
-  candidato recomendado é registrada via `POST /events`, alimentando o ranqueamento futuro.
-- **Sincronização com o api-core**, o serviço mantém uma conexão somente leitura com o PostgreSQL
-  do `api-core` e projeta esse estado no grafo Neo4j periodicamente (`SYNC_ON_STARTUP`) ou sob
-  demanda via rota interna autenticada (`POST /internal/sync/core`).
-- **Autenticação por API key**, todas as rotas de negócio exigem uma chave própria (`API_KEY`,
-  `RECOMMENDATION_API_KEY` ou `SYNC_API_KEY`, conforme a rota), comparadas com `hmac.compare_digest`
-  para evitar ataques de timing.
+- **Três feeds**, `GET /feeds/professionals`, `GET /feeds/offers` e `GET /feeds/suppliers` devolvem
+  os itens ranqueados por uma estratégia (`strategy`) e aceitam `company_id` e, quando faz sentido,
+  `profession_id` ou `local_unit_id`. Exigem o header `X-Recommendation-Key` e são pensados para
+  chamada servidor-a-servidor pelo `api-core`; a chave não pode ir para o navegador.
+- **Feeds públicos**, `GET /public/feeds/{professionals|offers|suppliers}` não exigem chave, nunca
+  tocam o Neo4j e respondem com `Cache-Control: public` (e `stale-if-error`) para que a Cloudflare
+  atenda os anônimos sem chegar à origem.
+- **Fallback SQL**, quando o grafo está fora do ar, sem snapshot ou não configurado, os feeds
+  autenticados respondem com `source: "fallback"` em vez de erro: uma amostra aleatória entre os
+  melhores itens elegíveis lidos do PostgreSQL, sem aplicar a estratégia pedida.
+- **Somente leitura**, o serviço não escreve no Neo4j nem no PostgreSQL. O grafo é construído pelo
+  `database-bootstrap`, e o contrato entre os dois está documentado na spec do projeto.
+- **Saúde sem reinício em cascata**, `/health/live` não depende de nada e `/health/ready` só falha
+  quando o PostgreSQL cai; o grafo aparece como `ready`, `unavailable`, `no_snapshot` ou `disabled`.
 
 ## Aprofunde-se no Projeto!
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md)
-- [RUNNING.md](./RUNNING.md)
-- {link do arquivo de deployment}
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- [RUNNING.md](./docs/RUNNING.md)
 
 ## Contribuindo
 
