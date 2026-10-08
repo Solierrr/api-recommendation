@@ -73,7 +73,7 @@ e o PostgreSQL do `api-core`, usado como rede de segurança quando o grafo não 
 ├── pyproject.toml                # Configuração de ruff, coverage e mypy
 ├── pytest.ini
 ├── requirements.txt
-├── requirements-dev.txt
+├── requirements.dev.txt
 ├── requirements.lock
 ├── requirements-ci.lock
 └── sonar-project.properties

@@ -1,7 +1,7 @@
 # Rodando o Projeto Localmente
 
 Este repositório é Python. O processo local é: clonar, criar um ambiente virtual, instalar as
-dependências (via `requirements.txt`/`requirements-dev.txt`, ou os lockfiles com hashes travados
+dependências (via `requirements.txt`/`requirements.dev.txt`, ou os lockfiles com hashes travados
 para reproduzir exatamente o ambiente de CI) e subir a aplicação via `uvicorn`. O serviço só
 precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feeds usam o fallback SQL.
 
@@ -54,14 +54,14 @@ code . -r
 Crie um ambiente virtual antes de instalar as dependências, para não poluir o Python global da
 máquina. O `pyproject.toml` deste repositório configura só as ferramentas de qualidade (`ruff`,
 `coverage`, `mypy`) — não há `[project]`/`[build-system]`, então o pacote não é instalável via
-`pip install -e .`. `requirements.txt` traz só o runtime, `requirements-dev.txt` acrescenta
+`pip install -e .`. `requirements.txt` traz só o runtime, `requirements.dev.txt` acrescenta
 lint/testes/auditoria, e `requirements.lock`/`requirements-ci.lock` são lockfiles com hashes (o
 mesmo lockfile instalado com `--require-hashes` dentro do `Dockerfile`).
 
 ```Comandos para instalação de dependências (desenvolvimento)
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -r requirements.txt -r requirements.dev.txt
 ```
 
 ```Comandos para instalação de dependências (reproduzindo o CI, com hashes travados)
