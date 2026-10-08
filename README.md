@@ -57,8 +57,8 @@ elegíveis lida direto do PostgreSQL.
 
 ## Aprofunde-se no Projeto!
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md)
-- [RUNNING.md](./RUNNING.md)
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- [RUNNING.md](./docs/RUNNING.md)
 
 ## Contribuindo
 
