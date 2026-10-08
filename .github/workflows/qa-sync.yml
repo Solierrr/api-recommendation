@@ -27,3 +27,6 @@ jobs:
       contents: write
       pull-requests: write
     uses: Solierrr/.github/.github/workflows/qa-sync.yml@main
+    with:
+      source-pr-number: ${{ github.event.issue.number }}
+      auto-merge: true

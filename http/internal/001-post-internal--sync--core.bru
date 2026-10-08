@@ -1,0 +1,19 @@
+meta {
+  name: [mutates] POST /internal/sync/core
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/internal/sync/core
+  body: none
+  auth: none
+}
+
+headers {
+  X-Sync-Key: {{syncKey}}
+}
+
+docs {
+  Synchronizes local PostgreSQL data into Neo4j. Side effect; run only when intended.
+}
