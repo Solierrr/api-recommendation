@@ -1,0 +1,19 @@
+meta {
+  name: GET /public/feeds/professionals
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/public/feeds/professionals
+  body: none
+  auth: none
+}
+
+params:query {
+  ~profession_id: {{professionId}}
+}
+
+docs {
+  Read-only, no key. SQL only, sanitized fields, Cache-Control public.
+}
