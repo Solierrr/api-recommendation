@@ -1,13 +1,12 @@
 # Arquitetura do Repositório
 
-O `api-recommendation` segue uma arquitetura em camadas dentro do pacote `app/`: rotas HTTP
-(`api/`) delegam para serviços de regra de negócio (`core/`), que por sua vez consultam
-repositórios (`repositories/`) responsáveis por toda a interação com Neo4j e PostgreSQL. Modelos
-Pydantic (`schemas/`) validam entrada e saída em cada rota. Essa separação existe porque o serviço
-combina duas fontes de dados com papéis muito distintos: o PostgreSQL do `api-core` é a fonte de
-verdade, acessada em modo somente leitura, enquanto o Neo4j é uma projeção derivada, otimizada para
-consultas de grafo de ranqueamento — a camada de repositório isola essa diferença do restante da
-aplicação.
+O `api-recommendation` é organizado por domínio, e não por camada técnica: cada feed
+(`professionals`, `offers`, `suppliers`) é um pacote em `app/feeds/` com tudo o que precisa (rota,
+serviço, estratégias de ranking, modelos de resposta e as consultas em arquivos `.cypher` e
+`.sql`). O que é comum a todos os feeds (configuração, autenticação, conexões, tratamento de erros
+e utilitários de ranking) fica na raiz de `app/`. O serviço é somente leitura e tem duas fontes:
+o Neo4j `feeddb`, uma projeção descartável do `api-core` construída pelo job `database-bootstrap`,
+e o PostgreSQL do `api-core`, usado como rede de segurança quando o grafo não responde.
 
 <p>
   <a href="https://github.com/syvixor/skills-icons">
@@ -15,95 +14,67 @@ aplicação.
   </a>
 </p>
 
-- **Arquitetura em camadas (API → Core → Repositories)**, `app/api/` expõe os routers FastAPI e
-  aplica a autenticação de cada rota; `app/core/` concentra as regras de negócio (ranqueamento,
-  sincronização, eventos); `app/repositories/` isola as queries Cypher (Neo4j) e SQL (PostgreSQL),
-  para que uma troca de banco não vaze para as camadas superiores.
-- **Duas fontes de dados com responsabilidades diferentes**, o PostgreSQL (`app/database.py`,
-  classe `PostgresService`) é acessado com um pool `asyncpg` restrito a transações
-  `readonly=True`, já que o schema (`scripts/core_schema.sql`) pertence ao `api-core`; o Neo4j
-  (classe `Neo4jService`) recebe leituras e escritas através de sessões dedicadas
-  (`read_session`/`write_session`), mantendo o padrão CQRS mesmo dentro do mesmo banco.
-- **Sincronização Postgres → Neo4j**, `app/core/sync_service.py` e
-  `app/repositories/graph_sync_repository.py` implementam a projeção do snapshot relacional do
-  `api-core` (ofertas, profissionais, profissões, qualificações, afiliações) para o grafo, disparada
-  na subida da aplicação quando `SYNC_ON_STARTUP=true` ou sob demanda pela rota interna
-  `POST /internal/sync/core`, protegida por lock de execução (`SyncInProgressError`) e por
-  validações de segurança do snapshot (`UnsafeSnapshotError`, retenção mínima de domínio via
-  `SYNC_MIN_DOMAIN_RETENTION_RATIO`).
-- **Autenticação por API key com escopos distintos**, três chaves independentes controlam acesso:
-  `API_KEY` (rotas legadas de recomendação), `RECOMMENDATION_API_KEY` (rotas novas de recomendação)
-  e `SYNC_API_KEY` (rota interna de sincronização) — comparadas com `hmac.compare_digest` para
-  mitigar ataques de timing (`app/core/security.py`, `app/api/sync.py`). Em produção,
-  `Settings.validate_runtime_security()` (`app/config.py`) exige que as três chaves existam, tenham
-  entre 32 e 512 caracteres e sejam diferentes entre si, além de forçar TLS no Neo4j
-  (`neo4j+s://`/`bolt+s://`), `sslmode` seguro no Postgres e a desativação do Swagger/Redoc.
-- **Segurança do container**, o `Dockerfile` usa `python:3.12-slim` como imagem base, cria um
-  usuário e grupo de sistema não-root (`app`) e roda o processo `uvicorn` com esse usuário, nunca
-  como root. As dependências são instaladas via `pip install --require-hashes` a partir do
-  `requirements.lock`, um lockfile gerado com `uv pip compile --generate-hashes`, garantindo que
-  cada pacote instalado corresponda exatamente ao hash travado e reduzindo o risco de dependências
-  adulteradas na cadeia de suprimento.
-- **Integração com o `api-core`**, este serviço não expõe escrita alguma sobre os dados do
-  `api-core` — a conexão com o PostgreSQL compartilhado é somente leitura
-  (`SET default_transaction_read_only = on`, transações `readonly=True`), e o schema consumido
-  (`scripts/core_schema.sql`) é uma cópia de referência do schema real do `api-core`, usada para
-  desenvolvimento e testes locais.
+- **Um pacote por feed**, `app/feeds/<feed>/` tem `router.py` (rota autenticada e rota pública),
+  `service.py` (decide entre o grafo e o fallback), `strategies.py` (ranking puro, sem I/O),
+  `schemas.py` (modelos de resposta), `candidates.cypher` e `fallback.sql`. Adicionar um feed é
+  adicionar um pacote e registrar os dois routers em `app/main.py`.
+- **Grafo primeiro, SQL como rede de segurança**, cada serviço tenta o grafo e, se o Neo4j não está
+  configurado, está fora do ar ou não tem snapshot ativo (`GraphUnavailableError`), cai no
+  `fallback.sql` e devolve `source: "fallback"` com um aviso. Erros de domínio (contexto inexistente,
+  dado insuficiente) nunca disparam o fallback: viram `404` ou `422`. Se nem o PostgreSQL responde,
+  a resposta é `503` com o código `FEED_UNAVAILABLE`.
+- **Neo4j tolerante**, `GraphService` (`app/database.py`) nunca derruba a aplicação: sem
+  `DB_NEO4J_URI` ele fica desligado (é o caso do QA no Render, que sempre usa o fallback), e uma
+  falha de conexão abre um período de espera (`GRAPH_RETRY_AFTER_SECONDS`) em que as requisições
+  vão direto ao SQL, sem pagar o timeout de novo.
+- **Somente o snapshot ativo**, as consultas Cypher leem apenas nós com `source = "api-core"` e
+  `sync_version` igual ao `SyncState.active_version`, então uma reconstrução em andamento nunca
+  aparece pela metade. Esse formato é o contrato com o `database-bootstrap`.
+- **Fallback amostral**, cada `fallback.sql` seleciona os `FALLBACK_POOL_SIZE` melhores itens
+  elegíveis e sorteia `RECOMMENDATION_RESULT_LIMIT` entre eles, para o feed rotacionar. A regra de
+  elegibilidade (modelo aprovado, fornecedor ativo com assinatura paga, técnico aprovado de usuário
+  ativo) é a mesma do grafo e fica documentada no contrato do `database-bootstrap`.
+- **Feeds públicos sanitizados**, `/public/feeds/*` usam modelos próprios, só com campos que podem
+  ser expostos a anônimos, e sempre são servidos pelo SQL. As respostas carregam
+  `Cache-Control: public, max-age=…, stale-if-error=…`.
+- **Autenticação por uma única chave**, `X-Recommendation-Key` (`app/security.py`), comparada com
+  `hmac.compare_digest`. Em produção, `Settings.validate_runtime_security()` exige a chave com 32 a
+  512 caracteres, `sslmode` seguro no PostgreSQL e Swagger desligado. O Neo4j do cluster é acessado
+  por `bolt://` interno, sem TLS.
+- **Segurança do container**, o `Dockerfile` usa `python:3.12-slim`, usuário não-root e instala as
+  dependências com `--require-hashes` a partir do `requirements.lock`.
 
 ```Tree do Repositório
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml              # Testes + cobertura
-│       ├── quality.yml         # Lint (ruff)
-│       ├── qa-sync.yml
-│       ├── release.yml
-│       ├── repo-cleanup.yml
-│       └── sonarqube.yml       # Análise SonarQube
 ├── app/
-│   ├── api/                    # Rotas HTTP (FastAPI routers)
-│   │   ├── events.py
-│   │   ├── health.py
-│   │   ├── recommendations.py
-│   │   └── sync.py
-│   ├── core/                   # Regras de negócio (services)
-│   │   ├── candidate_service.py
-│   │   ├── errors.py
-│   │   ├── event_service.py
-│   │   ├── ranking_service.py
-│   │   ├── recommendation_engine.py
-│   │   ├── recommendation_service.py
-│   │   ├── security.py
-│   │   ├── sync_service.py
-│   │   └── weights.py
-│   ├── repositories/           # Acesso a Neo4j (Cypher) e PostgreSQL (SQL)
-│   │   ├── candidate_repository.py
-│   │   ├── core_candidate_repository.py
-│   │   ├── core_graph_repository.py
-│   │   ├── event_repository.py
-│   │   ├── graph_sync_repository.py
-│   │   └── recommendation_repository.py
-│   ├── schemas/                 # Modelos Pydantic de entrada/saída
-│   │   ├── event.py
-│   │   ├── recommendation.py
-│   │   ├── recommendations.py
-│   │   └── responses.py
-│   ├── config.py                # Configurações (variáveis de ambiente)
-│   ├── database.py               # Gerenciamento das conexões Neo4j/PostgreSQL
-│   └── main.py                   # Ponto de entrada da aplicação (lifespan, routers)
-├── scripts/
-│   ├── core_schema.sql          # Schema de referência do PostgreSQL do api-core
-│   ├── seed.cypher               # Massa de dados de teste para o Neo4j
-│   └── seed.py                   # Executa o seed.cypher contra o banco configurado
-├── tests/                        # Testes unitários e de integração (pytest)
+│   ├── feeds/
+│   │   ├── professionals/        # router, service, strategies, schemas, candidates.cypher, fallback.sql
+│   │   ├── offers/               # idem
+│   │   ├── suppliers/            # idem
+│   │   ├── active_version.cypher # snapshot ativo (versão e idade)
+│   │   ├── local_unit.cypher     # contexto geográfico
+│   │   ├── common.py             # respostas, ranking, haversine, orquestração grafo/fallback
+│   │   ├── fallback.py           # execução do SQL e formatação dos itens do fallback
+│   │   └── graph.py              # leitura do snapshot ativo
+│   ├── config.py                 # Configurações (variáveis de ambiente)
+│   ├── database.py               # PostgresService e GraphService
+│   ├── dependencies.py           # Injeção dos serviços de banco
+│   ├── errors.py
+│   ├── health.py                 # /health/live e /health/ready
+│   ├── main.py                   # Ponto de entrada (lifespan, routers, tratamento de erros)
+│   ├── queries.py                # Leitura dos arquivos .cypher e .sql
+│   └── security.py
+├── http/                         # Coleção Bruno
+├── tests/
+│   ├── unit/
+│   └── integration/              # Neo4j e PostgreSQL reais (opt-in)
 ├── Dockerfile
-├── README.md
-├── ARCHITECTURE.md
-├── RUNNING.md
 ├── pyproject.toml                # Configuração de ruff, coverage e mypy
 ├── pytest.ini
-├── requirements.txt               # Dependências de runtime
-├── requirements-dev.txt           # Dependências de desenvolvimento (lint, testes, auditoria)
-├── requirements.lock              # Lockfile de runtime com hashes (uv)
-├── requirements-ci.lock           # Lockfile de runtime + dev com hashes (uv)
+├── requirements.txt
+├── requirements-dev.txt
+├── requirements.lock
+├── requirements-ci.lock
 └── sonar-project.properties
 ```

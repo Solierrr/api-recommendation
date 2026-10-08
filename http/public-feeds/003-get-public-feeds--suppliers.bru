@@ -1,0 +1,15 @@
+meta {
+  name: GET /public/feeds/suppliers
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/public/feeds/suppliers
+  body: none
+  auth: none
+}
+
+docs {
+  Read-only, no key. SQL only, sanitized fields, Cache-Control public.
+}

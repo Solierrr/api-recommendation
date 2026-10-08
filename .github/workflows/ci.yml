@@ -15,22 +15,51 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PIP_ONLY_BINARY: ":all:"
+      INTEGRATION_ALLOW_DESTRUCTIVE: "true"
       NEO4J_INTEGRATION_URI: bolt://localhost:7687
       NEO4J_INTEGRATION_USER: neo4j
       NEO4J_INTEGRATION_PASSWORD: test-password-for-ci
-      NEO4J_INTEGRATION_ALLOW_DESTRUCTIVE: "true"
+      NEO4J_INTEGRATION_DATABASE: feeddb
+      POSTGRES_INTEGRATION_HOST: localhost
+      POSTGRES_INTEGRATION_PORT: "5432"
+      POSTGRES_INTEGRATION_DATABASE: coredb
+      POSTGRES_INTEGRATION_USER: postgres
+      POSTGRES_INTEGRATION_PASSWORD: test-password-for-ci
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: test-password-for-ci
+      PGDATABASE: coredb
     services:
       neo4j:
         image: neo4j:5.26-community
         env:
           NEO4J_AUTH: neo4j/test-password-for-ci
+          NEO4J_initial_dbms_default__database: feeddb
           NEO4J_server_memory_heap_initial__size: 256m
           NEO4J_server_memory_heap_max__size: 512m
         ports:
           - 7687:7687
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test-password-for-ci
+          POSTGRES_DB: coredb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Solierrr/database-console
+          ref: feature/web-access-local
+          path: database-console
 
       - uses: actions/setup-python@v5
         with:
@@ -42,6 +71,12 @@ jobs:
         run: |
           python -m pip install pip==26.2.1
           python -m pip install --require-hashes --requirement requirements-ci.lock
+
+      - name: Load the api-core schema
+        run: |
+          for file in enums.sql schema.sql migrations/V10__technician_review_status.sql; do
+            psql --set ON_ERROR_STOP=1 --quiet --file "database-console/db/core/$file"
+          done
 
       - name: Run tests with coverage gate
         run: |
@@ -61,15 +96,8 @@ jobs:
           docker run --rm \
             --entrypoint python \
             --env APP_ENVIRONMENT=test \
-            --env NEO4J_URI=bolt://localhost:7687 \
-            --env NEO4J_USER=neo4j \
-            --env NEO4J_PASSWORD=test-password \
-            --env DB_URL=jdbc:postgresql://localhost:5432/test \
-            --env DB_USERNAME=test \
-            --env DB_PASSWORD=test-password \
-            --env SYNC_API_KEY=test-sync-key-with-at-least-32-characters \
             api-recommendation:ci \
-            -c "from app.main import app; assert '/health/live' in app.openapi()['paths']"
+            -c "from app.main import app; paths = app.openapi()['paths']; assert '/health/live' in paths and '/feeds/offers' in paths"
 
       - name: Upload coverage
         if: ${{ always() && hashFiles('coverage.xml') != '' }}

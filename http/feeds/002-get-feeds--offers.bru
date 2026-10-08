@@ -1,0 +1,25 @@
+meta {
+  name: GET /feeds/offers
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/feeds/offers
+  body: none
+  auth: none
+}
+
+params:query {
+  strategy: best_value
+  ~local_unit_id: {{localUnitId}}
+  ~company_id: {{companyId}}
+}
+
+headers {
+  X-Recommendation-Key: {{recommendationKey}}
+}
+
+docs {
+  Read-only. Strategies: best_value, most_efficient, nearest_available (requires local_unit_id), most_proven.
+}

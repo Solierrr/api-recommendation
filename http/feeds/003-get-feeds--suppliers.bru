@@ -1,0 +1,25 @@
+meta {
+  name: GET /feeds/suppliers
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/feeds/suppliers
+  body: none
+  auth: none
+}
+
+params:query {
+  strategy: most_proven
+  ~local_unit_id: {{localUnitId}}
+  ~company_id: {{companyId}}
+}
+
+headers {
+  X-Recommendation-Key: {{recommendationKey}}
+}
+
+docs {
+  Read-only. Strategies: most_proven, broadest_catalog, nearest (requires local_unit_id).
+}
