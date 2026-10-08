@@ -1,0 +1,25 @@
+meta {
+  name: GET /feeds/professionals
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/feeds/professionals
+  body: none
+  auth: none
+}
+
+params:query {
+  strategy: best_match
+  ~profession_id: {{professionId}}
+  ~company_id: {{companyId}}
+}
+
+headers {
+  X-Recommendation-Key: {{recommendationKey}}
+}
+
+docs {
+  Read-only. Strategies: top_rated, most_qualified, most_experienced, most_reliable, best_match. Falls back to a SQL sample (source: fallback) when the graph is unavailable.
+}
