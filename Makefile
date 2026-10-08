@@ -55,7 +55,7 @@ env: extract-env ## Alias for extract-env (kept for backwards compatibility)
 setup: ## Create the virtualenv and install runtime and development dependencies
 	$(PYTHON) -m venv $(VENV)
 	$(VENV_BIN)/python -m pip install --upgrade pip
-	$(VENV_BIN)/python -m pip install -r requirements.txt -r requirements-dev.txt
+	$(VENV_BIN)/python -m pip install -r requirements.txt -r requirements.dev.txt
 
 run: ## Start the FastAPI development server
 	$(VENV_BIN)/python -m uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload

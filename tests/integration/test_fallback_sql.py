@@ -43,7 +43,7 @@ async def test_professionals_fallback_honours_the_profession_filter(seeded_postg
     assert await service.public(INSTALLER) == []
 
 
-async def test_offers_fallback_returns_only_eligible_offers_with_aggregated_stock(seeded_postgres):
+async def test_offers_fallback_returns_only_eligible_offers_with_their_stock(seeded_postgres):
     service = OffersService(NoGraph(), seeded_postgres)  # type: ignore[arg-type]
 
     items = await service.public()

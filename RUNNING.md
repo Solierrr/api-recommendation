@@ -1,7 +1,7 @@
 # Rodando o Projeto Localmente
 
 Este repositório é Python. O processo local é: clonar, criar um ambiente virtual, instalar as
-dependências (via `requirements.txt`/`requirements-dev.txt`, ou os lockfiles com hashes travados
+dependências (via `requirements.txt`/`requirements.dev.txt`, ou os lockfiles com hashes travados
 para reproduzir exatamente o ambiente de CI) e subir a aplicação via `uvicorn`. O serviço só
 precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feeds usam o fallback SQL.
 
@@ -13,7 +13,7 @@ precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feed
 
 ## Possíveis Impedimentos
 
-- **Python 3.12 instalado localmente**, a mesma versão usada no `Dockerfile` (`python:3.12-slim`)
+- **Python 3.14 instalado localmente**, a mesma versão usada no `Dockerfile` (`python:3.14-slim`)
   — rodar fora do container exige essa versão instalada na máquina.
 - **Acesso ao PostgreSQL do `api-core`**, obrigatório: o serviço não sobe sem ele
   (`DB_POSTGRES_HOST`, `DB_POSTGRES_PORT`, `DB_POSTGRES_CORE`, `DB_POSTGRES_USER`,
@@ -54,14 +54,14 @@ code . -r
 Crie um ambiente virtual antes de instalar as dependências, para não poluir o Python global da
 máquina. O `pyproject.toml` deste repositório configura só as ferramentas de qualidade (`ruff`,
 `coverage`, `mypy`) — não há `[project]`/`[build-system]`, então o pacote não é instalável via
-`pip install -e .`. `requirements.txt` traz só o runtime, `requirements-dev.txt` acrescenta
+`pip install -e .`. `requirements.txt` traz só o runtime, `requirements.dev.txt` acrescenta
 lint/testes/auditoria, e `requirements.lock`/`requirements-ci.lock` são lockfiles com hashes (o
 mesmo lockfile instalado com `--require-hashes` dentro do `Dockerfile`).
 
 ```Comandos para instalação de dependências (desenvolvimento)
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -r requirements.txt -r requirements.dev.txt
 ```
 
 ```Comandos para instalação de dependências (reproduzindo o CI, com hashes travados)
