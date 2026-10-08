@@ -41,7 +41,7 @@ e o PostgreSQL do `api-core`, usado como rede de segurança quando o grafo não 
   `hmac.compare_digest`. Em produção, `Settings.validate_runtime_security()` exige a chave com 32 a
   512 caracteres, `sslmode` seguro no PostgreSQL e Swagger desligado. O Neo4j do cluster é acessado
   por `bolt://` interno, sem TLS.
-- **Segurança do container**, o `Dockerfile` usa `python:3.12-slim`, usuário não-root e instala as
+- **Segurança do container**, o `Dockerfile` usa `python:3.14-slim`, usuário não-root e instala as
   dependências com `--require-hashes` a partir do `requirements.lock`.
 
 ```Tree do Repositório

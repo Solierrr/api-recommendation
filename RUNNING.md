@@ -13,7 +13,7 @@ precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feed
 
 ## Possíveis Impedimentos
 
-- **Python 3.12 instalado localmente**, a mesma versão usada no `Dockerfile` (`python:3.12-slim`)
+- **Python 3.14 instalado localmente**, a mesma versão usada no `Dockerfile` (`python:3.14-slim`)
   — rodar fora do container exige essa versão instalada na máquina.
 - **Acesso ao PostgreSQL do `api-core`**, obrigatório: o serviço não sobe sem ele
   (`DB_POSTGRES_HOST`, `DB_POSTGRES_PORT`, `DB_POSTGRES_CORE`, `DB_POSTGRES_USER`,
