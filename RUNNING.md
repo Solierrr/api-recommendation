@@ -2,9 +2,8 @@
 
 Este repositório é Python. O processo local é: clonar, criar um ambiente virtual, instalar as
 dependências (via `requirements.txt`/`requirements-dev.txt`, ou os lockfiles com hashes travados
-para reproduzir exatamente o ambiente de CI) e subir a aplicação via `uvicorn`. Antes de iniciar,
-verifique a seção de impedimentos abaixo — o serviço depende de duas fontes de dados externas
-(Neo4j e PostgreSQL) mesmo em ambiente local.
+para reproduzir exatamente o ambiente de CI) e subir a aplicação via `uvicorn`. O serviço só
+precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feeds usam o fallback SQL.
 
 <p>
   <a href="https://github.com/syvixor/skills-icons">
@@ -16,16 +15,15 @@ verifique a seção de impedimentos abaixo — o serviço depende de duas fontes
 
 - **Python 3.12 instalado localmente**, a mesma versão usada no `Dockerfile` (`python:3.12-slim`)
   — rodar fora do container exige essa versão instalada na máquina.
-- **Acesso a uma instância Neo4j**, o serviço se conecta a um banco de grafos via driver
-  assíncrono oficial (`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`) — use uma instância local
-  (Docker) ou uma instância gerenciada (ex: AuraDB) e preencha as credenciais no `.env`.
-- **Acesso ao PostgreSQL do `api-core`**, a sincronização de dados (`SyncService`) lê o banco
-  relacional do `api-core` em modo somente leitura (`DB_POSTGRES_HOST`, `DB_POSTGRES_PORT`,
-  `DB_POSTGRES_CORE`, `DB_POSTGRES_USER`, `DB_POSTGRES_PASSWORD`) — sem essas credenciais, a API
-  sobe mas a sincronização e as rotas que dependem de dados sincronizados falham.
-- **API keys locais**, `API_KEY`, `RECOMMENDATION_API_KEY` e `SYNC_API_KEY` precisam ser geradas
-  manualmente para autenticar as rotas de negócio localmente (ver comando abaixo) — sem elas, as
-  rotas protegidas retornam `503` ou `401`.
+- **Acesso ao PostgreSQL do `api-core`**, obrigatório: o serviço não sobe sem ele
+  (`DB_POSTGRES_HOST`, `DB_POSTGRES_PORT`, `DB_POSTGRES_CORE`, `DB_POSTGRES_USER`,
+  `DB_POSTGRES_PASSWORD`). O schema real é o do `database-console/db/core`.
+- **Neo4j `feeddb`, opcional**, preencha `DB_NEO4J_URI`, `DB_NEO4J_USER`, `DB_NEO4J_PASSWORD` e
+  `DB_NEO4J_FEED` para ranquear pelo grafo. O grafo é populado pelo job
+  [`database-bootstrap`](https://github.com/Solierrr/database-bootstrap); sem ele (ou sem as
+  variáveis), os feeds respondem com `source: "fallback"`.
+- **Chave de recomendação**, `RECOMMENDATION_API_KEY` protege `/feeds/*`. Fora de produção, sem a
+  variável, as rotas ficam abertas; em produção ela é obrigatória.
 
 ## Instalação do Projeto
 
@@ -56,12 +54,9 @@ code . -r
 Crie um ambiente virtual antes de instalar as dependências, para não poluir o Python global da
 máquina. O `pyproject.toml` deste repositório configura só as ferramentas de qualidade (`ruff`,
 `coverage`, `mypy`) — não há `[project]`/`[build-system]`, então o pacote não é instalável via
-`pip install -e .`. As dependências ficam em arquivos `requirements*` separados:
-`requirements.txt` traz só o runtime, `requirements-dev.txt` acrescenta lint/testes/auditoria, e
-`requirements.lock`/`requirements-ci.lock` são lockfiles gerados via `uv pip compile
---generate-hashes` (o mesmo lockfile instalado com `--require-hashes` dentro do `Dockerfile`) — use
-os lockfiles quando quiser reproduzir exatamente o ambiente de CI/produção, ou os arquivos soltos
-para desenvolvimento do dia a dia.
+`pip install -e .`. `requirements.txt` traz só o runtime, `requirements-dev.txt` acrescenta
+lint/testes/auditoria, e `requirements.lock`/`requirements-ci.lock` são lockfiles com hashes (o
+mesmo lockfile instalado com `--require-hashes` dentro do `Dockerfile`).
 
 ```Comandos para instalação de dependências (desenvolvimento)
 python -m venv .venv
@@ -75,10 +70,8 @@ python -m venv .venv
 pip install --require-hashes -r requirements-ci.lock
 ```
 
-Copie um `.env.example` (se existir) ou crie um `.env` na raiz com, no mínimo, as variáveis de
-`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `DB_POSTGRES_HOST`/`DB_POSTGRES_PORT`/
-`DB_POSTGRES_CORE`/`DB_POSTGRES_USER`/`DB_POSTGRES_PASSWORD` e as três API keys (`API_KEY`,
-`RECOMMENDATION_API_KEY`, `SYNC_API_KEY`). Para gerar uma API key localmente:
+Copie o `.env.example` para `.env` e preencha, no mínimo, as variáveis `DB_POSTGRES_*`. Para gerar a
+chave de recomendação localmente:
 
 ```Comando para gerar uma API key local
 python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -104,8 +97,34 @@ quando `DOCS_ENABLED=true`, o padrão em desenvolvimento; em produção essa var
 
 ```Comandos de testes e lint
 pytest --cov=app --cov-report=term-missing
-ruff check app tests scripts
+ruff check app tests
+ruff format --check app tests
+mypy app
 ```
+
+Os testes de integração rodam contra bancos reais descartáveis e só executam com a confirmação
+explícita `INTEGRATION_ALLOW_DESTRUCTIVE=true`, porque truncam as tabelas do `coredb` e apagam todo
+o grafo:
+
+```Comandos para subir os bancos de teste
+docker run -d --name rec-neo4j -p 127.0.0.1:7687:7687 \
+  -e NEO4J_AUTH=neo4j/test-password-for-ci \
+  -e NEO4J_initial_dbms_default__database=feeddb neo4j:5.26-community
+docker run -d --name rec-postgres -p 127.0.0.1:5432:5432 \
+  -e POSTGRES_PASSWORD=test-password-for-ci -e POSTGRES_DB=coredb postgres:16
+```
+
+Carregue o schema do `api-core` com `enums.sql`, `schema.sql` e a migração
+`V10__technician_review_status.sql` do `database-console/db/core` (por exemplo com `psql -f`) e rode:
+
+```Comando dos testes de integração
+INTEGRATION_ALLOW_DESTRUCTIVE=true \
+NEO4J_INTEGRATION_URI=bolt://127.0.0.1:7687 NEO4J_INTEGRATION_PASSWORD=test-password-for-ci \
+POSTGRES_INTEGRATION_HOST=127.0.0.1 POSTGRES_INTEGRATION_PASSWORD=test-password-for-ci \
+pytest
+```
+
+Nunca aponte essas variáveis para os bancos reais.
 
 ### Rodando com Docker
 
