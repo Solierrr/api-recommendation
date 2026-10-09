@@ -138,3 +138,18 @@ Nunca aponte essas variáveis para os bancos reais.
 docker build -t api-recommendation .
 docker run --rm -p 8000:8000 --env-file .env api-recommendation
 ```
+
+## Telemetria (OpenTelemetry)
+
+O serviço envia traces, métricas e logs por OTLP, pelo wrapper `opentelemetry-instrument` (auto-instrumentação de FastAPI, `asyncpg` e `logging`), sem código na aplicação. O `entrypoint.sh` só usa o wrapper quando `OTEL_SDK_DISABLED=false`; sem isso o serviço sobe exatamente como antes.
+
+Para ver a telemetria na sua máquina, use o Grafana local pelo `make up OBS=1` (ver `docs-warehouse/helps/TRY-LOCAL.md`). Manualmente, com um Collector em `http://otel-collector:4318`:
+
+```text
+OTEL_SDK_DISABLED=false
+OTEL_SERVICE_NAME=api-recommendation
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_RESOURCE_ATTRIBUTES=service.namespace=solaria,deployment.environment=local
+OTEL_PYTHON_LOG_CORRELATION=true
+```
