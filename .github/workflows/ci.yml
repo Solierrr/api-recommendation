@@ -58,7 +58,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Solierrr/database-console
-          ref: feature/web-access-local
           path: database-console
 
       - uses: actions/setup-python@v5
