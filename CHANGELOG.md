@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/Solierrr/api-recommendation/compare/v0.3.0...v0.4.0) (2026-10-09)
+
+
+### Features
+
+* add the local run commands ([5d055d3](https://github.com/Solierrr/api-recommendation/commit/5d055d3e62cba55e948a0fc499988abdd8bc5052))
+
 ## [0.3.0](https://github.com/Solierrr/api-recommendation/compare/v0.2.0...v0.3.0) (2026-10-02)
 
 
