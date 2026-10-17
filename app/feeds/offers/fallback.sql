@@ -29,7 +29,7 @@ best_value AS (
         supplier.id::text AS supplier_id,
         company.trade_name AS supplier_trade_name,
         model.id::text AS model_id,
-        model.brand,
+        brand.name AS brand,
         model.model AS model,
         model.power_wp::double precision AS power_wp,
         model.efficiency::double precision AS efficiency,
@@ -42,6 +42,8 @@ best_value AS (
     FROM offer
     JOIN model
       ON model.id = offer.fk_model
+    JOIN brand
+      ON brand.id = model.fk_brand
     JOIN supplier
       ON supplier.id = offer.fk_supplier
     JOIN company
