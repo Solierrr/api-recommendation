@@ -11,6 +11,7 @@ CORE_TABLES = {
     "certification",
     "company",
     "inventory",
+    "brand",
     "model",
     "offer",
     "person",
