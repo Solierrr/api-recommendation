@@ -96,7 +96,7 @@ class CoreGraphRepository:
     FIND_LOCAL_UNITS = """
         WITH address_geolocation AS (
             SELECT
-                address_id,
+                fk_address AS address_id,
                 COUNT(*)::integer AS geolocation_count,
                 CASE WHEN COUNT(*) = 1
                     THEN MIN(latitude)::double precision
@@ -104,77 +104,78 @@ class CoreGraphRepository:
                 CASE WHEN COUNT(*) = 1
                     THEN MIN(longitude)::double precision
                 END AS longitude
-            FROM geolocation
-            GROUP BY address_id
+            FROM geolocalization
+            GROUP BY fk_address
         )
         SELECT
             local_unit.id::text AS id,
-            local_unit.unit_type AS location_type,
+            local_unit.location_type::text AS location_type,
             local_unit.complement,
             COALESCE(address_geolocation.geolocation_count, 0) AS geolocation_count,
             address_geolocation.latitude,
             address_geolocation.longitude
         FROM local_unit
         LEFT JOIN address_geolocation
-          ON address_geolocation.address_id = local_unit.address_id
+          ON address_geolocation.address_id = local_unit.fk_address
         ORDER BY local_unit.id
     """
 
     FIND_PANEL_OFFERS = """
         WITH active_subscriptions AS (
             SELECT
-                supplier_id,
+                fk_supplier AS supplier_id,
                 BOOL_OR(
                     status = 'PAID'
                     AND (end_date IS NULL OR end_date > CURRENT_TIMESTAMP)
                 ) AS subscription_active
             FROM subscription
-            GROUP BY supplier_id
+            GROUP BY fk_supplier
         ),
         accepted_usage AS (
             SELECT
-                proposal_item.offer_id AS offer_id,
+                proposal_item.fk_offer AS offer_id,
                 COALESCE(SUM(proposal_item.quantity), 0)::integer
                     AS accepted_proposal_quantity
             FROM proposal_item
             JOIN proposal
-              ON proposal.id = proposal_item.proposal_id
+              ON proposal.id = proposal_item.fk_proposal
             WHERE proposal.status = 'ACCEPTED'
-            GROUP BY proposal_item.offer_id
+            GROUP BY proposal_item.fk_offer
         ),
         company_geolocation AS (
             SELECT
                 company.id AS company_id,
-                COUNT(geolocation.id)::integer AS geolocation_count,
-                CASE WHEN COUNT(geolocation.id) = 1
-                    THEN MIN(geolocation.latitude)::double precision
+                COUNT(geolocalization.id)::integer AS geolocation_count,
+                CASE WHEN COUNT(geolocalization.id) = 1
+                    THEN MIN(geolocalization.latitude)::double precision
                 END AS latitude,
-                CASE WHEN COUNT(geolocation.id) = 1
-                    THEN MIN(geolocation.longitude)::double precision
+                CASE WHEN COUNT(geolocalization.id) = 1
+                    THEN MIN(geolocalization.longitude)::double precision
                 END AS longitude
             FROM company
-            LEFT JOIN geolocation
-              ON geolocation.address_id = company.address_id
+            LEFT JOIN geolocalization
+              ON geolocalization.fk_address = company.fk_address
             GROUP BY company.id
         )
         SELECT
             model.id::text AS model_id,
-            model.brand,
-            model.model_name AS model,
+            brand.name AS brand,
+            model.model AS model,
             model.power_wp::double precision AS power_wp,
             model.efficiency::double precision AS efficiency,
-            model.dimension::double precision AS dimension,
+            COALESCE(model.dimension, model.width * model.length)::double precision
+                AS dimension,
             model.weight::double precision AS weight,
-            model.status AS model_status,
+            model.status::text AS model_status,
             offer.id::text AS offer_id,
             ROUND(offer.unit_price * 100)::bigint AS unit_price_cents,
             offer.availability,
             offer.expiration_date AS expiration_at,
-            stock.quantity AS inventory_quantity,
-            LEAST(offer.availability, stock.quantity)::integer
+            inventory.quantity AS inventory_quantity,
+            LEAST(offer.availability, inventory.quantity)::integer
                 AS effective_availability,
             supplier.id::text AS supplier_id,
-            supplier.status AS supplier_status,
+            supplier.status::text AS supplier_status,
             supplier.business_type,
             company.id::text AS company_id,
             company.trade_name,
@@ -187,14 +188,16 @@ class CoreGraphRepository:
             company_geolocation.longitude AS supplier_longitude
         FROM offer
         JOIN model
-          ON model.id = offer.model_id
+          ON model.id = offer.fk_model
+        JOIN brand
+          ON brand.id = model.fk_brand
         JOIN supplier
-          ON supplier.id = offer.supplier_id
+          ON supplier.id = offer.fk_supplier
         JOIN company
-          ON company.id = supplier.company_id
-        JOIN stock
-          ON stock.supplier_id = offer.supplier_id
-         AND stock.model_id = offer.model_id
+          ON company.id = supplier.fk_company
+        JOIN inventory
+          ON inventory.fk_supplier = offer.fk_supplier
+         AND inventory.fk_model = offer.fk_model
         JOIN active_subscriptions
           ON active_subscriptions.supplier_id = supplier.id
          AND active_subscriptions.subscription_active IS TRUE
@@ -202,16 +205,18 @@ class CoreGraphRepository:
           ON accepted_usage.offer_id = offer.id
         LEFT JOIN company_geolocation
           ON company_geolocation.company_id = company.id
-        WHERE model.status = 'APPROVED'
+        WHERE model.product_type = 'PANEL'
+          AND model.status = 'APPROVED'
           AND model.power_wp > 0
           AND model.efficiency >= 0
           AND model.efficiency <= 100
-          AND model.dimension > 0
+          AND COALESCE(model.dimension, model.width * model.length) > 0
           AND model.weight > 0
           AND supplier.status = 'ACTIVE'
+          AND offer.commercial_status = 'ACTIVE'
           AND offer.unit_price > 0
           AND offer.availability > 0
-          AND stock.quantity > 0
+          AND inventory.quantity > 0
           AND (
               offer.expiration_date IS NULL
               OR offer.expiration_date > CURRENT_TIMESTAMP
@@ -234,16 +239,16 @@ class CoreGraphRepository:
     FIND_PROFESSIONALS = """
         WITH review_scores AS (
             SELECT
-                professional_id AS technician_id,
+                fk_professional AS technician_id,
                 AVG(rating)::double precision AS average_rating,
                 COUNT(*)::integer AS review_count
             FROM professional_review
             WHERE active IS TRUE
-            GROUP BY professional_id
+            GROUP BY fk_professional
         ),
         service_metrics AS (
             SELECT
-                professional.id AS technician_id,
+                technician.id AS technician_id,
                 COUNT(DISTINCT technical_service.id)::integer
                     AS assigned_service_count,
                 COUNT(DISTINCT technical_service.id) FILTER (
@@ -255,18 +260,18 @@ class CoreGraphRepository:
                 COUNT(DISTINCT technical_service.id) FILTER (
                     WHERE technical_service.status IN ('OPEN', 'IN_PROGRESS')
                 )::integer AS active_workload
-            FROM professional
-            LEFT JOIN professional_affiliation
-              ON professional_affiliation.professional_id = professional.id
+            FROM technician
+            LEFT JOIN technician_affiliation
+              ON technician_affiliation.fk_technician = technician.id
             LEFT JOIN service_executor
-              ON service_executor.professional_affiliation_id = professional_affiliation.id
+              ON service_executor.fk_technician_affiliation = technician_affiliation.id
             LEFT JOIN technical_service
-              ON technical_service.id = service_executor.service_id
-            GROUP BY professional.id
+              ON technical_service.id = service_executor.fk_service
+            GROUP BY technician.id
         )
         SELECT
-            professional.id::text AS technician_id,
-            'Profissional ' || LEFT(professional.id::text, 8) AS name,
+            technician.id::text AS technician_id,
+            person.name AS name,
             professional_registration.council || ' ' || professional_registration.number AS crea,
             profession.id::text AS profession_id,
             profession.name AS profession_name,
@@ -290,26 +295,32 @@ class CoreGraphRepository:
                 ),
                 ARRAY[]::text[]
             ) AS certification_names
-        FROM professional
+        FROM technician
+        JOIN person
+          ON person.id = technician.fk_person
         JOIN users
-          ON users.id = professional.user_id
+          ON users.id = person.fk_users
         JOIN professional_registration
-          ON professional_registration.professional_id = professional.id
+          ON professional_registration.fk_technician = technician.id
         JOIN profession
-          ON profession.id = professional_registration.profession_id
+          ON profession.id = professional_registration.fk_profession
+        LEFT JOIN certification_record
+          ON certification_record.fk_professional_registration = professional_registration.id
         LEFT JOIN certification
-          ON certification.professional_id = professional.id
+          ON certification.id = certification_record.fk_certification
+         AND (certification.validity IS NULL OR certification.validity >= CURRENT_TIMESTAMP)
         LEFT JOIN review_scores
-          ON review_scores.technician_id = professional.id
+          ON review_scores.technician_id = technician.id
         LEFT JOIN service_metrics
-          ON service_metrics.technician_id = professional.id
+          ON service_metrics.technician_id = technician.id
         WHERE profession.name IS NOT NULL
           AND (
               professional_registration.expiration_date IS NULL
               OR professional_registration.expiration_date >= CURRENT_TIMESTAMP
           )
         GROUP BY
-            professional.id,
+            technician.id,
+            person.name,
             professional_registration.council,
             professional_registration.number,
             profession.id,
@@ -320,56 +331,56 @@ class CoreGraphRepository:
             service_metrics.completed_service_count,
             service_metrics.canceled_service_count,
             service_metrics.active_workload
-        ORDER BY professional.id, profession.id
+        ORDER BY technician.id, profession.id
     """
 
     FIND_AFFILIATIONS = """
         WITH review_scores AS (
             SELECT
-                professional_id AS technician_id,
+                fk_professional AS technician_id,
                 AVG(rating)::double precision AS average_rating,
                 COUNT(*)::integer AS review_count
             FROM professional_review
             WHERE active IS TRUE
-            GROUP BY professional_id
+            GROUP BY fk_professional
         ),
         service_metrics AS (
             SELECT
-                professional.id AS technician_id,
+                technician.id AS technician_id,
                 COUNT(DISTINCT technical_service.id) FILTER (
                     WHERE technical_service.status IN ('OPEN', 'IN_PROGRESS')
                 )::integer AS active_workload
-            FROM professional
-            LEFT JOIN professional_affiliation AS any_affiliation
-              ON any_affiliation.professional_id = professional.id
+            FROM technician
+            LEFT JOIN technician_affiliation AS any_affiliation
+              ON any_affiliation.fk_technician = technician.id
             LEFT JOIN service_executor
-              ON service_executor.professional_affiliation_id = any_affiliation.id
+              ON service_executor.fk_technician_affiliation = any_affiliation.id
             LEFT JOIN technical_service
-              ON technical_service.id = service_executor.service_id
-            GROUP BY professional.id
+              ON technical_service.id = service_executor.fk_service
+            GROUP BY technician.id
         ),
         company_geolocation AS (
             SELECT
                 company.id AS company_id,
-                COUNT(geolocation.id)::integer AS geolocation_count,
-                CASE WHEN COUNT(geolocation.id) = 1
-                    THEN MIN(geolocation.latitude)::double precision
+                COUNT(geolocalization.id)::integer AS geolocation_count,
+                CASE WHEN COUNT(geolocalization.id) = 1
+                    THEN MIN(geolocalization.latitude)::double precision
                 END AS latitude,
-                CASE WHEN COUNT(geolocation.id) = 1
-                    THEN MIN(geolocation.longitude)::double precision
+                CASE WHEN COUNT(geolocalization.id) = 1
+                    THEN MIN(geolocalization.longitude)::double precision
                 END AS longitude
             FROM company
-            LEFT JOIN geolocation
-              ON geolocation.address_id = company.address_id
+            LEFT JOIN geolocalization
+              ON geolocalization.fk_address = company.fk_address
             GROUP BY company.id
         )
         SELECT
-            professional_affiliation.id::text AS affiliation_id,
-            professional_affiliation.affiliation_type,
+            technician_affiliation.id::text AS affiliation_id,
+            technician_affiliation.affiliation_type::text AS affiliation_type,
             true AS active,
-            professional.id::text AS technician_id,
+            technician.id::text AS technician_id,
             NULL AS crea,
-            'Profissional ' || LEFT(professional.id::text, 8) AS name,
+            person.name AS name,
             company.id::text AS company_id,
             company.trade_name AS company_trade_name,
             COALESCE(review_scores.average_rating, 0.0) AS average_rating_global,
@@ -379,26 +390,29 @@ class CoreGraphRepository:
                 AS company_geolocation_count,
             company_geolocation.latitude AS company_latitude,
             company_geolocation.longitude AS company_longitude
-        FROM professional_affiliation
-        JOIN professional
-          ON professional.id = professional_affiliation.professional_id
+        FROM technician_affiliation
+        JOIN technician
+          ON technician.id = technician_affiliation.fk_technician
+        JOIN person
+          ON person.id = technician.fk_person
         JOIN users
-          ON users.id = professional.user_id
+          ON users.id = person.fk_users
         LEFT JOIN company
-          ON company.id = professional_affiliation.company_id
+          ON company.id = technician_affiliation.fk_company
         LEFT JOIN company_geolocation
           ON company_geolocation.company_id = company.id
         LEFT JOIN review_scores
-          ON review_scores.technician_id = professional.id
+          ON review_scores.technician_id = technician.id
         LEFT JOIN service_metrics
-          ON service_metrics.technician_id = professional.id
-        ORDER BY professional_affiliation.id
+          ON service_metrics.technician_id = technician.id
+        ORDER BY technician_affiliation.id
     """
 
-    # O schema atual do api-core não modela turnos de trabalho (não existe
-    # tabela "shift"). Por decisão de produto, a disponibilidade por horário
-    # não é avaliada: todo técnico é considerado disponível. Esta consulta
-    # sempre retorna um conjunto vazio, mantendo o contrato de colunas.
+    # O schema possui a tabela "shift", mas por decisão de produto a
+    # disponibilidade por horário não é avaliada: todo técnico é considerado
+    # disponível quando o serviço tem data agendada (ver
+    # RecommendationEngine._is_declared_available). Esta consulta retorna um
+    # conjunto vazio, mantendo o contrato de colunas.
     FIND_SHIFTS = """
         SELECT
             NULL::text AS shift_id,
@@ -409,13 +423,10 @@ class CoreGraphRepository:
         WHERE FALSE
     """
 
-    # O schema atual não possui coluna de data agendada em technical_service.
-    # Por decisão de produto, created_at é usado como scheduled_at: a data de
-    # criação do registro é tratada como o momento em que a tarefa foi aberta.
     FIND_TECHNICAL_SERVICES = """
         WITH address_geolocation AS (
             SELECT
-                address_id,
+                fk_address AS address_id,
                 COUNT(*)::integer AS geolocation_count,
                 CASE WHEN COUNT(*) = 1
                     THEN MIN(latitude)::double precision
@@ -423,15 +434,16 @@ class CoreGraphRepository:
                 CASE WHEN COUNT(*) = 1
                     THEN MIN(longitude)::double precision
                 END AS longitude
-            FROM geolocation
-            GROUP BY address_id
+            FROM geolocalization
+            GROUP BY fk_address
         )
         SELECT
             technical_service.id::text AS service_id,
             technical_service.purpose,
             LOWER(BTRIM(technical_service.purpose)) AS normalized_purpose,
-            technical_service.status,
-            technical_service.created_at AS scheduled_at,
+            technical_service.status::text AS status,
+            COALESCE(technical_service.scheduled_date, technical_service.created_at)
+                AS scheduled_at,
             technical_service.created_at,
             technical_service.end_date AS end_at,
             technical_project.id::text AS project_id,
@@ -442,45 +454,47 @@ class CoreGraphRepository:
             address_geolocation.longitude
         FROM technical_service
         JOIN technical_project
-          ON technical_project.id = technical_service.technical_project_id
+          ON technical_project.id = technical_service.fk_technical_project
         LEFT JOIN local_unit
-          ON local_unit.id = technical_project.local_unit_id
+          ON local_unit.id = technical_project.fk_local_unit
         LEFT JOIN address_geolocation
-          ON address_geolocation.address_id = local_unit.address_id
+          ON address_geolocation.address_id = local_unit.fk_address
         ORDER BY technical_service.id
     """
 
     FIND_SERVICE_EXPERIENCES = """
         SELECT
-            professional_affiliation.professional_id::text AS technician_id,
+            technician_affiliation.fk_technician::text AS technician_id,
             LOWER(BTRIM(technical_service.purpose)) AS normalized_purpose,
             COUNT(DISTINCT technical_service.id)::integer AS completed_count
         FROM technical_service
         JOIN service_executor
-          ON service_executor.service_id = technical_service.id
-        JOIN professional_affiliation
-          ON professional_affiliation.id = service_executor.professional_affiliation_id
+          ON service_executor.fk_service = technical_service.id
+        JOIN technician_affiliation
+          ON technician_affiliation.id = service_executor.fk_technician_affiliation
         WHERE technical_service.status = 'COMPLETED'
           AND BTRIM(technical_service.purpose) <> ''
         GROUP BY
-            professional_affiliation.professional_id,
+            technician_affiliation.fk_technician,
             LOWER(BTRIM(technical_service.purpose))
-        ORDER BY professional_affiliation.professional_id, normalized_purpose
+        ORDER BY technician_affiliation.fk_technician, normalized_purpose
     """
 
     FIND_ASSIGNMENTS = """
         SELECT
             service_executor.id::text AS executor_id,
-            service_executor.service_id::text AS service_id,
-            service_executor.professional_affiliation_id::text AS affiliation_id,
-            service_executor.role_function AS function
+            service_executor.fk_service::text AS service_id,
+            service_executor.fk_technician_affiliation::text AS affiliation_id,
+            service_executor.function AS function
         FROM service_executor
-        JOIN professional_affiliation
-          ON professional_affiliation.id = service_executor.professional_affiliation_id
-        JOIN professional
-          ON professional.id = professional_affiliation.professional_id
+        JOIN technician_affiliation
+          ON technician_affiliation.id = service_executor.fk_technician_affiliation
+        JOIN technician
+          ON technician.id = technician_affiliation.fk_technician
+        JOIN person
+          ON person.id = technician.fk_person
         JOIN users
-          ON users.id = professional.user_id
+          ON users.id = person.fk_users
         ORDER BY service_executor.id
     """
 

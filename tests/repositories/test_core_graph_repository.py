@@ -119,3 +119,44 @@ def test_inactive_affiliation_assignments_keep_technician_identity_in_graph() ->
     # e usuários são tratados como ativos por decisão de produto.
     assert "professional_affiliation.active" not in (CoreGraphRepository.FIND_AFFILIATIONS)
     assert "professional_affiliation.active" not in (CoreGraphRepository.FIND_ASSIGNMENTS)
+
+
+SNAPSHOT_QUERIES = [
+    "FIND_LOCAL_UNITS",
+    "FIND_PANEL_OFFERS",
+    "FIND_PROFESSIONS",
+    "FIND_PROFESSIONALS",
+    "FIND_AFFILIATIONS",
+    "FIND_SHIFTS",
+    "FIND_TECHNICAL_SERVICES",
+    "FIND_SERVICE_EXPERIENCES",
+    "FIND_ASSIGNMENTS",
+]
+LEGACY_NAMES = [
+    "FROM professional\n",
+    "JOIN professional\n",
+    "FROM professional_affiliation",
+    "JOIN stock",
+    "FROM geolocation\n",
+    "LEFT JOIN geolocation",
+    "model.model_name",
+    "model.brand,",
+    "local_unit.unit_type",
+]
+
+
+@pytest.mark.parametrize("name", SNAPSHOT_QUERIES)
+def test_snapshot_queries_use_current_core_schema_names(name) -> None:
+    query = getattr(CoreGraphRepository, name)
+
+    for legacy in LEGACY_NAMES:
+        assert legacy not in query, f"{name} usa nome do schema antigo: {legacy!r}"
+
+
+def test_panel_offers_only_include_solar_panels_with_stock_and_active_offer() -> None:
+    query = CoreGraphRepository.FIND_PANEL_OFFERS
+
+    assert "model.product_type = 'PANEL'" in query
+    assert "JOIN inventory" in query
+    assert "offer.commercial_status = 'ACTIVE'" in query
+    assert "COALESCE(model.dimension, model.width * model.length)" in query
