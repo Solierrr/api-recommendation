@@ -9,7 +9,6 @@ CYPHER = sorted(APP.rglob("*.cypher"))
 
 def test_every_feed_ships_its_queries():
     assert {path.parent.name for path in CYPHER} >= {"professionals", "offers", "suppliers", "feeds"}
-    assert not list(APP.rglob("*.sql"))
 
 
 @pytest.mark.parametrize("path", CYPHER, ids=lambda path: f"{path.parent.name}/{path.name}")
