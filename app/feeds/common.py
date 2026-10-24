@@ -1,5 +1,4 @@
-import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -11,16 +10,13 @@ from fastapi import Response
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.errors import FeedDataUnavailableError, GraphUnavailableError
-
-logger = logging.getLogger(__name__)
+from app.errors import FeedDataUnavailableError
 
 EARTH_RADIUS_KM = 6371.0088
 
 
 class FeedSource(StrEnum):
     GRAPH = "graph"
-    FALLBACK = "fallback"
 
 
 class FeedContext(BaseModel):
@@ -121,19 +117,6 @@ def bounded(candidates: list[dict], pool_limit: int) -> list[dict]:
     return candidates
 
 
-async def graph_or_fallback(
-    graph_call: Callable[[], Awaitable[FeedResult]],
-    fallback_call: Callable[[], Awaitable[list[dict]]],
-    fallback_warning: str,
-) -> FeedResult:
-    try:
-        return await graph_call()
-    except GraphUnavailableError as error:
-        logger.warning("Feed servido pelo fallback SQL: %s", error)
-    items = await fallback_call()
-    return FeedResult(FeedSource.FALLBACK, None, items, [fallback_warning])
-
-
 COMPANY_WARNING = "company_id foi recebido, mas a personalização por empresa ainda não influencia o ranking."
 
 
@@ -156,7 +139,7 @@ def build_response(
 
 
 def build_public_response(items: list[dict]) -> dict[str, Any]:
-    return {"source": FeedSource.FALLBACK, "generated_at": now(), "items": items}
+    return {"source": FeedSource.GRAPH, "generated_at": now(), "items": items}
 
 
 def set_public_cache(response: Response) -> None:

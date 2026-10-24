@@ -3,8 +3,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from app.database import GraphService, PostgresService
-from app.dependencies import get_graph, get_postgres
+from app.database import GraphService
+from app.dependencies import get_graph
 from app.feeds.common import (
     FeedResponse,
     PublicFeedResponse,
@@ -25,11 +25,8 @@ router = APIRouter(
 public_router = APIRouter(prefix="/public/feeds/suppliers", tags=["public-feeds"])
 
 
-def get_service(
-    graph: Annotated[GraphService, Depends(get_graph)],
-    postgres: Annotated[PostgresService, Depends(get_postgres)],
-) -> SuppliersService:
-    return SuppliersService(graph, postgres)
+def get_service(graph: Annotated[GraphService, Depends(get_graph)]) -> SuppliersService:
+    return SuppliersService(graph)
 
 
 @router.get("", response_model=FeedResponse[SupplierItem])

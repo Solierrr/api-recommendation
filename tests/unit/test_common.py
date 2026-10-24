@@ -4,7 +4,7 @@ import pytest
 from fastapi import Response
 
 from app.config import settings
-from app.errors import FeedDataUnavailableError, GraphUnavailableError
+from app.errors import FeedDataUnavailableError
 from app.feeds.common import (
     FeedResult,
     FeedSource,
@@ -12,7 +12,6 @@ from app.feeds.common import (
     bounded,
     build_public_response,
     build_response,
-    graph_or_fallback,
     haversine_km,
     normalized,
     ranked,
@@ -81,45 +80,6 @@ def test_bounded_refuses_pools_above_the_limit():
     assert error.value.code == "CANDIDATE_POOL_TOO_LARGE"
 
 
-async def test_graph_or_fallback_prefers_the_graph():
-    async def from_graph():
-        return FeedResult(FeedSource.GRAPH, "v1", [{"id": 1}], [])
-
-    async def from_sql():
-        raise AssertionError("o fallback não deveria ser chamado")
-
-    result = await graph_or_fallback(from_graph, from_sql, "aviso")
-
-    assert result.source is FeedSource.GRAPH
-    assert result.sync_version == "v1"
-
-
-async def test_graph_or_fallback_uses_sql_when_the_graph_is_unavailable():
-    async def from_graph():
-        raise GraphUnavailableError("fora")
-
-    async def from_sql():
-        return [{"id": 9}]
-
-    result = await graph_or_fallback(from_graph, from_sql, "aviso")
-
-    assert result.source is FeedSource.FALLBACK
-    assert result.sync_version is None
-    assert result.items == [{"id": 9}]
-    assert result.warnings == ["aviso"]
-
-
-async def test_graph_or_fallback_does_not_hide_domain_errors():
-    async def from_graph():
-        raise FeedDataUnavailableError("CODE", "mensagem")
-
-    async def from_sql():
-        raise AssertionError("o fallback não deveria ser chamado")
-
-    with pytest.raises(FeedDataUnavailableError):
-        await graph_or_fallback(from_graph, from_sql, "aviso")
-
-
 def test_build_response_adds_the_company_warning_only_when_a_company_is_sent():
     result = FeedResult(FeedSource.GRAPH, "v1", [], ["base"])
 
@@ -132,10 +92,10 @@ def test_build_response_adds_the_company_warning_only_when_a_company_is_sent():
     assert without_company["context"]["feed"] == "offers"
 
 
-def test_public_response_is_always_marked_as_fallback():
+def test_public_response_is_marked_as_coming_from_the_graph():
     body = build_public_response([{"id": 1}])
 
-    assert body["source"] is FeedSource.FALLBACK
+    assert body["source"] is FeedSource.GRAPH
     assert body["items"] == [{"id": 1}]
 
 

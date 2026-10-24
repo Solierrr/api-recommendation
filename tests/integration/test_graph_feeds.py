@@ -1,13 +1,17 @@
 import pytest
 
-from app.errors import ContextNotFoundError, FeedDataUnavailableError, SnapshotUnavailableError
+from app.errors import (
+    ContextNotFoundError,
+    FeedDataUnavailableError,
+    GraphUnavailableError,
+    SnapshotUnavailableError,
+)
 from app.feeds.offers.service import OffersService
 from app.feeds.offers.strategies import OfferStrategy
 from app.feeds.professionals.service import ProfessionalsService
 from app.feeds.professionals.strategies import ProfessionalStrategy
 from app.feeds.suppliers.service import SuppliersService
 from app.feeds.suppliers.strategies import SupplierStrategy
-from tests.fakes import FakePostgres
 from tests.integration import graph_seed as seed
 from tests.integration.conftest import needs_neo4j
 
@@ -19,7 +23,7 @@ def ids(result, field):
 
 
 async def test_professionals_come_only_from_the_active_snapshot_and_active_users(seeded_graph):
-    service = ProfessionalsService(seeded_graph, FakePostgres())
+    service = ProfessionalsService(seeded_graph)
 
     result = await service.recommend(ProfessionalStrategy.TOP_RATED, None)
 
@@ -34,7 +38,7 @@ async def test_professionals_come_only_from_the_active_snapshot_and_active_users
 
 
 async def test_professionals_can_be_filtered_by_profession(seeded_graph):
-    service = ProfessionalsService(seeded_graph, FakePostgres())
+    service = ProfessionalsService(seeded_graph)
 
     result = await service.recommend(ProfessionalStrategy.BEST_MATCH, seed_uuid(seed.PROFESSION))
 
@@ -44,7 +48,7 @@ async def test_professionals_can_be_filtered_by_profession(seeded_graph):
 
 
 async def test_an_unknown_profession_is_a_not_found_error(seeded_graph):
-    service = ProfessionalsService(seeded_graph, FakePostgres())
+    service = ProfessionalsService(seeded_graph)
 
     with pytest.raises(ContextNotFoundError) as error:
         await service.recommend(
@@ -55,7 +59,7 @@ async def test_an_unknown_profession_is_a_not_found_error(seeded_graph):
 
 
 async def test_offers_exclude_rejected_models_and_suspended_suppliers(seeded_graph):
-    service = OffersService(seeded_graph, FakePostgres())
+    service = OffersService(seeded_graph)
 
     result = await service.recommend(OfferStrategy.MOST_PROVEN, None)
 
@@ -66,7 +70,7 @@ async def test_offers_exclude_rejected_models_and_suspended_suppliers(seeded_gra
 
 
 async def test_nearest_offers_are_ordered_by_distance_from_the_unit(seeded_graph):
-    service = OffersService(seeded_graph, FakePostgres())
+    service = OffersService(seeded_graph)
 
     result = await service.recommend(OfferStrategy.NEAREST_AVAILABLE, seed_uuid(seed.UNIT))
 
@@ -76,7 +80,7 @@ async def test_nearest_offers_are_ordered_by_distance_from_the_unit(seeded_graph
 
 
 async def test_an_unknown_local_unit_is_a_not_found_error(seeded_graph):
-    service = OffersService(seeded_graph, FakePostgres())
+    service = OffersService(seeded_graph)
 
     with pytest.raises(ContextNotFoundError) as error:
         await service.recommend(OfferStrategy.BEST_VALUE, seed_uuid("00000000-0000-4000-8000-0000000000fe"))
@@ -85,7 +89,7 @@ async def test_an_unknown_local_unit_is_a_not_found_error(seeded_graph):
 
 
 async def test_nearest_offers_without_a_unit_are_refused(seeded_graph):
-    service = OffersService(seeded_graph, FakePostgres())
+    service = OffersService(seeded_graph)
 
     with pytest.raises(FeedDataUnavailableError) as error:
         await service.recommend(OfferStrategy.NEAREST_AVAILABLE, None)
@@ -94,7 +98,7 @@ async def test_nearest_offers_without_a_unit_are_refused(seeded_graph):
 
 
 async def test_suppliers_are_aggregated_from_their_eligible_offers(seeded_graph):
-    service = SuppliersService(seeded_graph, FakePostgres())
+    service = SuppliersService(seeded_graph)
 
     result = await service.recommend(SupplierStrategy.MOST_PROVEN, None)
 
@@ -106,7 +110,7 @@ async def test_suppliers_are_aggregated_from_their_eligible_offers(seeded_graph)
 
 
 async def test_nearest_suppliers_use_the_unit_location(seeded_graph):
-    service = SuppliersService(seeded_graph, FakePostgres())
+    service = SuppliersService(seeded_graph)
 
     result = await service.recommend(SupplierStrategy.NEAREST, seed_uuid(seed.UNIT))
 
@@ -114,7 +118,7 @@ async def test_nearest_suppliers_use_the_unit_location(seeded_graph):
 
 
 async def test_without_a_snapshot_the_graph_reports_it_is_unavailable(empty_graph):
-    service = OffersService(empty_graph, FakePostgres(rows=[]))
+    service = OffersService(empty_graph)
 
     with pytest.raises(SnapshotUnavailableError):
         async with empty_graph.read_session() as session:
@@ -122,8 +126,8 @@ async def test_without_a_snapshot_the_graph_reports_it_is_unavailable(empty_grap
 
             await graph.active_snapshot(session)
 
-    result = await service.recommend(OfferStrategy.BEST_VALUE, None)
-    assert result.source == "fallback"
+    with pytest.raises(GraphUnavailableError):
+        await service.recommend(OfferStrategy.BEST_VALUE, None)
 
 
 async def test_the_active_snapshot_reports_its_version_and_age(seeded_graph):

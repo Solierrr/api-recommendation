@@ -6,8 +6,8 @@ from fastapi.responses import JSONResponse
 
 from app import health
 from app.config import settings
-from app.database import graph_service, postgres_service
-from app.errors import FeedError
+from app.database import graph_service
+from app.errors import FeedError, FeedUnavailableError, GraphUnavailableError
 from app.feeds.offers import router as offers
 from app.feeds.professionals import router as professionals
 from app.feeds.suppliers import router as suppliers
@@ -20,14 +20,11 @@ logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
 async def lifespan(app: FastAPI):
     settings.validate_runtime_security()
     try:
-        await postgres_service.connect()
-        logger.info("Conexão somente leitura com PostgreSQL estabelecida")
         await graph_service.connect()
         yield
     finally:
         await graph_service.close()
-        await postgres_service.close()
-        logger.info("Conexões com Neo4j e PostgreSQL encerradas")
+        logger.info("Conexão com o Neo4j encerrada")
 
 
 app = FastAPI(
@@ -45,6 +42,15 @@ async def feed_error_handler(request: Request, error: FeedError) -> JSONResponse
     return JSONResponse(
         status_code=error.status_code,
         content={"detail": {"code": error.code, "message": error.message}},
+    )
+
+
+@app.exception_handler(GraphUnavailableError)
+async def graph_unavailable_handler(request: Request, error: GraphUnavailableError) -> JSONResponse:
+    logger.warning("Feed indisponível: %s", error)
+    return await feed_error_handler(
+        request,
+        FeedUnavailableError("FEED_UNAVAILABLE", "Não foi possível obter o feed: o grafo está indisponível."),
     )
 
 
