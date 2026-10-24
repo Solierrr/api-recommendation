@@ -3,11 +3,11 @@
 Este repositório é Python. O processo local é: clonar, criar um ambiente virtual, instalar as
 dependências (via `requirements.txt`/`requirements.dev.txt`, ou os lockfiles com hashes travados
 para reproduzir exatamente o ambiente de CI) e subir a aplicação via `uvicorn`. O serviço só
-precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feeds usam o fallback SQL.
+precisa do Neo4j `feeddb`; sem ele os feeds respondem `503`.
 
 <p>
   <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,pydantic,neo4j,postgresql" height="48" alt="Rodando o Projeto — Python">
+    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,pydantic,neo4j" height="48" alt="Rodando o Projeto — Python">
   </a>
 </p>
 
@@ -15,13 +15,10 @@ precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feed
 
 - **Python 3.14 instalado localmente**, a mesma versão usada no `Dockerfile` (`python:3.14-slim`)
   — rodar fora do container exige essa versão instalada na máquina.
-- **Acesso ao PostgreSQL do `api-core`**, obrigatório: o serviço não sobe sem ele
-  (`DB_POSTGRES_HOST`, `DB_POSTGRES_PORT`, `DB_POSTGRES_CORE`, `DB_POSTGRES_USER`,
-  `DB_POSTGRES_PASSWORD`). O schema real é o do `database-console/db/core`.
-- **Neo4j `feeddb`, opcional**, preencha `DB_NEO4J_URI`, `DB_NEO4J_USER`, `DB_NEO4J_PASSWORD` e
-  `DB_NEO4J_FEED` para ranquear pelo grafo. O grafo é populado pelo job
+- **Neo4j `feeddb`, obrigatório**, preencha `DB_NEO4J_URI`, `DB_NEO4J_USER`, `DB_NEO4J_PASSWORD` e
+  `DB_NEO4J_FEED`. O grafo é populado pelo job
   [`database-bootstrap`](https://github.com/Solierrr/database-bootstrap); sem ele (ou sem as
-  variáveis), os feeds respondem com `source: "fallback"`.
+  variáveis), os feeds respondem `503`.
 - **Chave de recomendação**, `RECOMMENDATION_API_KEY` protege `/feeds/*`. Fora de produção, sem a
   variável, as rotas ficam abertas; em produção ela é obrigatória.
 
@@ -70,7 +67,7 @@ python -m venv .venv
 pip install --require-hashes -r requirements-ci.lock
 ```
 
-Copie o `.env.example` para `.env` e preencha, no mínimo, as variáveis `DB_POSTGRES_*`. Para gerar a
+Copie o `.env.example` para `.env` e preencha, no mínimo, as variáveis `DB_NEO4J_*`. Para gerar a
 chave de recomendação localmente:
 
 ```Comando para gerar uma API key local
@@ -102,29 +99,24 @@ ruff format --check app tests
 mypy app
 ```
 
-Os testes de integração rodam contra bancos reais descartáveis e só executam com a confirmação
-explícita `INTEGRATION_ALLOW_DESTRUCTIVE=true`, porque truncam as tabelas do `coredb` e apagam todo
-o grafo:
+Os testes de integração rodam contra um Neo4j real descartável e só executam com a confirmação
+explícita `INTEGRATION_ALLOW_DESTRUCTIVE=true`, porque apagam todo o grafo:
 
-```Comandos para subir os bancos de teste
+```Comando para subir o banco de teste
 docker run -d --name rec-neo4j -p 127.0.0.1:7687:7687 \
   -e NEO4J_AUTH=neo4j/test-password-for-ci \
   -e NEO4J_initial_dbms_default__database=feeddb neo4j:5.26-community
-docker run -d --name rec-postgres -p 127.0.0.1:5432:5432 \
-  -e POSTGRES_PASSWORD=test-password-for-ci -e POSTGRES_DB=coredb postgres:16
 ```
 
-Carregue o schema do `api-core` com `enums.sql`, `schema.sql` e a migração
-`V10__technician_review_status.sql` do `database-console/db/core` (por exemplo com `psql -f`) e rode:
+Rode:
 
 ```Comando dos testes de integração
 INTEGRATION_ALLOW_DESTRUCTIVE=true \
 NEO4J_INTEGRATION_URI=bolt://127.0.0.1:7687 NEO4J_INTEGRATION_PASSWORD=test-password-for-ci \
-POSTGRES_INTEGRATION_HOST=127.0.0.1 POSTGRES_INTEGRATION_PASSWORD=test-password-for-ci \
 pytest
 ```
 
-Nunca aponte essas variáveis para os bancos reais.
+Nunca aponte essas variáveis para o banco real.
 
 ### Rodando com Docker
 
@@ -141,7 +133,7 @@ docker run --rm -p 8000:8000 --env-file .env api-recommendation
 
 ## Telemetria (OpenTelemetry)
 
-O serviço envia traces, métricas e logs por OTLP, pelo wrapper `opentelemetry-instrument` (auto-instrumentação de FastAPI, `asyncpg` e `logging`), sem código na aplicação. O `entrypoint.sh` só usa o wrapper quando `OTEL_SDK_DISABLED=false`; sem isso o serviço sobe exatamente como antes.
+O serviço envia traces, métricas e logs por OTLP, pelo wrapper `opentelemetry-instrument` (auto-instrumentação de FastAPI e `logging`), sem código na aplicação. O `entrypoint.sh` só usa o wrapper quando `OTEL_SDK_DISABLED=false`; sem isso o serviço sobe exatamente como antes.
 
 Para ver a telemetria na sua máquina, suba o Grafana local com `make obs-up` no repositório `infra-otel-collector` (ver `docs-warehouse/helps/TRY-LOCAL.md`). Manualmente, com um Collector em `http://otel-collector:4318`:
 
