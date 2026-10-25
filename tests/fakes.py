@@ -1,4 +1,4 @@
-"""Test doubles assíncronos para Neo4j e PostgreSQL."""
+"""Test doubles assíncronos para o Neo4j."""
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -45,31 +45,3 @@ class FakeGraph:
         assert self.handler is not None
         self.session = FakeSession(self.handler)
         yield self.session
-
-
-class FakeConnection:
-    def __init__(self, rows: list[dict] | None = None, error: Exception | None = None):
-        self.rows = rows or []
-        self.error = error
-        self.calls: list[tuple[str, tuple]] = []
-
-    async def fetch(self, query: str, *parameters: Any) -> list[dict]:
-        self.calls.append((query, parameters))
-        if self.error is not None:
-            raise self.error
-        return self.rows
-
-    async def fetchval(self, query: str) -> int:
-        self.calls.append((query, ()))
-        if self.error is not None:
-            raise self.error
-        return 1
-
-
-class FakePostgres:
-    def __init__(self, rows: list[dict] | None = None, error: Exception | None = None):
-        self.connection_instance = FakeConnection(rows, error)
-
-    @asynccontextmanager
-    async def connection(self) -> AsyncIterator[FakeConnection]:
-        yield self.connection_instance

@@ -9,43 +9,26 @@ from app.config import settings
 
 
 @pytest.fixture
-def services(monkeypatch):
-    postgres = AsyncMock()
+def graph(monkeypatch):
     graph = AsyncMock()
-    monkeypatch.setattr(main, "postgres_service", postgres)
     monkeypatch.setattr(main, "graph_service", graph)
-    return postgres, graph
+    return graph
 
 
-def test_startup_connects_postgres_and_the_graph_and_closes_both(services):
-    postgres, graph = services
-
+def test_startup_connects_the_graph_and_closes_it(graph):
     with TestClient(main.app):
-        postgres.connect.assert_awaited_once()
         graph.connect.assert_awaited_once()
 
     graph.close.assert_awaited_once()
-    postgres.close.assert_awaited_once()
 
 
-def test_startup_fails_fast_when_postgres_is_unavailable(services):
-    postgres, graph = services
-    postgres.connect.side_effect = OSError("sem rota para o banco")
-
-    with pytest.raises(OSError), TestClient(main.app):
-        pass
-
-    graph.connect.assert_not_awaited()
-    postgres.close.assert_awaited_once()
-
-
-def test_startup_refuses_an_insecure_production_configuration(services, monkeypatch):
+def test_startup_refuses_an_insecure_production_configuration(graph, monkeypatch):
     monkeypatch.setattr(settings, "APP_ENVIRONMENT", "production")
 
     with pytest.raises(RuntimeError), TestClient(main.app):
         pass
 
-    services[0].connect.assert_not_awaited()
+    graph.connect.assert_not_awaited()
 
 
 def test_driver_schema_notifications_do_not_flood_the_logs():

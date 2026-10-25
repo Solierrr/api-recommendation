@@ -6,7 +6,7 @@ from pydantic import SecretStr
 
 import app.database as database
 from app.config import settings
-from app.database import GraphService, PostgresService
+from app.database import GraphService
 from app.errors import GraphUnavailableError
 
 
@@ -137,69 +137,3 @@ async def test_graph_close_releases_the_driver(configured, monkeypatch):
 
     assert driver.closed
     assert not graph.available
-
-
-class FakeTransaction:
-    def __init__(self, readonly: bool):
-        self.readonly = readonly
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exception):
-        return False
-
-
-class FakeConnection:
-    def __init__(self):
-        self.statements: list[str] = []
-
-    async def execute(self, statement: str) -> None:
-        self.statements.append(statement)
-
-    async def fetchval(self, statement: str) -> int:
-        self.statements.append(statement)
-        return 1
-
-    def transaction(self, readonly: bool):
-        return FakeTransaction(readonly)
-
-
-class FakePool:
-    def __init__(self):
-        self.connection = FakeConnection()
-        self.closed = False
-
-    @asynccontextmanager
-    async def acquire(self):
-        yield self.connection
-
-    async def close(self) -> None:
-        self.closed = True
-
-
-async def test_postgres_connects_read_only_and_exposes_read_only_connections(monkeypatch):
-    pool = FakePool()
-    captured: dict = {}
-
-    async def create_pool(**arguments):
-        captured.update(arguments)
-        return pool
-
-    monkeypatch.setattr(database.asyncpg, "create_pool", create_pool)
-    service = PostgresService()
-
-    await service.connect()
-
-    assert "SET default_transaction_read_only = on" in pool.connection.statements
-    assert captured["server_settings"]["application_name"] == "api-recommendation"
-    async with service.connection() as connection:
-        assert connection is pool.connection
-    await service.close()
-    assert pool.closed
-
-
-async def test_postgres_connection_requires_an_initialized_pool():
-    with pytest.raises(RuntimeError, match="Pool"):
-        async with PostgresService().connection():
-            pass

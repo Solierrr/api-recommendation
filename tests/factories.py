@@ -81,25 +81,3 @@ def graph_handler(
         raise AssertionError(f"consulta inesperada: {query[:60]}")
 
     return handle
-
-
-def fallback_professional(number: int) -> dict:
-    row = professional(number)
-    return row
-
-
-def fallback_offer(number: int) -> dict:
-    row = offer(number)
-    row.pop("supplier_geolocation_count")
-    row.pop("supplier_latitude")
-    row.pop("supplier_longitude")
-    row["price_per_wp"] = row["unit_price_cents"] / 100.0 / row["power_wp"]
-    return row
-
-
-def fallback_supplier(number: int) -> dict:
-    row = supplier(number)
-    row.pop("supplier_geolocation_count")
-    row.pop("supplier_latitude")
-    row.pop("supplier_longitude")
-    return row

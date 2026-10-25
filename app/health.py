@@ -1,16 +1,13 @@
-import logging
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.database import GraphService, PostgresService
-from app.dependencies import get_graph, get_postgres
+from app.database import GraphService
+from app.dependencies import get_graph
 from app.errors import GraphUnavailableError, SnapshotUnavailableError
 from app.feeds import graph as graph_queries
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
 
@@ -23,7 +20,6 @@ class LivenessResponse(BaseModel):
 
 class ReadinessResponse(BaseModel):
     status: Literal["ready"]
-    postgres: Literal["connected"]
     graph: GraphStatus
     active_sync_version: UUID | None = None
     snapshot_age_seconds: int | None = None
@@ -52,17 +48,5 @@ async def liveness_check():
 
 
 @router.get("/health/ready", response_model=ReadinessResponse)
-async def readiness_check(
-    graph: Annotated[GraphService, Depends(get_graph)],
-    postgres: Annotated[PostgresService, Depends(get_postgres)],
-):
-    try:
-        async with postgres.connection() as connection:
-            await connection.fetchval("SELECT 1")
-    except Exception:
-        logger.exception("Falha no readiness check do PostgreSQL")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Serviço indisponível: o PostgreSQL não respondeu",
-        ) from None
-    return {"status": "ready", "postgres": "connected", **await _graph_status(graph)}
+async def readiness_check(graph: Annotated[GraphService, Depends(get_graph)]):
+    return {"status": "ready", **await _graph_status(graph)}
