@@ -42,8 +42,8 @@ elegíveis lida direto do PostgreSQL.
 
 - **Três feeds**, `GET /feeds/professionals`, `GET /feeds/offers` e `GET /feeds/suppliers` devolvem
   os itens ranqueados por uma estratégia (`strategy`) e aceitam `company_id` e, quando faz sentido,
-  `profession_id` ou `local_unit_id`. Exigem o header `X-Recommendation-Key` e são pensados para
-  chamada servidor-a-servidor pelo `api-core`; a chave não pode ir para o navegador.
+  `profession_id` ou `local_unit_id`. Exigem a chave de serviço do chamador no header
+  `X-Service-Key` (hoje só o `mcp-database`); a chave não pode ir para o navegador.
 - **Feeds públicos**, `GET /public/feeds/{professionals|offers|suppliers}` não exigem chave, nunca
   tocam o Neo4j e respondem com `Cache-Control: public` (e `stale-if-error`) para que a Cloudflare
   atenda os anônimos sem chegar à origem.
@@ -52,8 +52,11 @@ elegíveis lida direto do PostgreSQL.
   melhores itens elegíveis lidos do PostgreSQL, sem aplicar a estratégia pedida.
 - **Somente leitura**, o serviço não escreve no Neo4j nem no PostgreSQL. O grafo é construído pelo
   `database-bootstrap`, e o contrato entre os dois está documentado na spec do projeto.
-- **Saúde sem reinício em cascata**, `/health/live` não depende de nada e `/health/ready` só falha
-  quando o PostgreSQL cai; o grafo aparece como `ready`, `unavailable`, `no_snapshot` ou `disabled`.
+- **Saúde sem reinício em cascata**, `/health` não depende de nada e `/ready` só responde `DOWN`
+  (503) quando o PostgreSQL cai; o grafo fica de fora, porque sem ele os feeds usam o fallback SQL.
+- **Contrato padronizado**, Swagger em `/docs` e contrato em `/openapi.json` (desligados em PROD por
+  `DOCS_ENABLED=false`), erros em `application/problem+json` e o contrato exportado em `openapi.yaml`
+  por `make openapi`.
 
 ## Aprofunde-se no Projeto!
 

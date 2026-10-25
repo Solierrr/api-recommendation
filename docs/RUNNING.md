@@ -22,8 +22,9 @@ precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feed
   `DB_NEO4J_FEED` para ranquear pelo grafo. O grafo é populado pelo job
   [`database-bootstrap`](https://github.com/Solierrr/database-bootstrap); sem ele (ou sem as
   variáveis), os feeds respondem com `source: "fallback"`.
-- **Chave de recomendação**, `RECOMMENDATION_API_KEY` protege `/feeds/*`. Fora de produção, sem a
-  variável, as rotas ficam abertas; em produção ela é obrigatória.
+- **Chave de serviço**, `SERVICE_KEY_MCP_DATABASE` (pasta `/service-keys` do Infisical) protege
+  `/feeds/*`, com no mínimo 32 caracteres; sem chave configurada as rotas recusam tudo. A
+  `RECOMMENDATION_API_KEY` antiga ainda é aceita até o `mcp-database` enviar `X-Service-Key`.
 
 ## Instalação do Projeto
 
@@ -83,9 +84,11 @@ Suba a aplicação:
 uvicorn app.main:app --reload
 ```
 
-Acesse a documentação interativa (Swagger) em `http://localhost:8000/docs` — disponível apenas
-quando `DOCS_ENABLED=true`, o padrão em desenvolvimento; em produção essa variável é forçada a
-`false` por `Settings.validate_runtime_security()`.
+Acesse a documentação interativa (Swagger) em `http://localhost:8000/docs` e o contrato em
+`http://localhost:8000/openapi.json` — disponíveis apenas quando `DOCS_ENABLED=true`, o padrão em
+desenvolvimento; em produção essa variável é forçada a `false` por
+`Settings.validate_runtime_security()`. Depois de mudar rotas ou modelos, regenere o contrato
+versionado com `make openapi` (o CI confere se o `openapi.yaml` bate com o código).
 
 ### Rodando testes e lint
 
