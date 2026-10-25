@@ -24,7 +24,10 @@ class Settings(BaseSettings):
     DB_POSTGRES_PASSWORD: SecretStr = SecretStr("solier")
     DB_POSTGRES_SSLMODE: str = "disable"
 
+    SERVICE_KEY_MCP_DATABASE: SecretStr | None = None
+    # Chave antiga (X-Recommendation-Key), aceita só até o mcp-database enviar X-Service-Key.
     RECOMMENDATION_API_KEY: SecretStr | None = None
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     RECOMMENDATION_RESULT_LIMIT: int = Field(default=10, ge=1, le=50)
     RECOMMENDATION_POOL_LIMIT: int = Field(default=500, ge=10, le=5000)
     FALLBACK_POOL_SIZE: int = Field(default=30, ge=1, le=500)
@@ -54,16 +57,30 @@ class Settings(BaseSettings):
     def graph_configured(self) -> bool:
         return bool(self.DB_NEO4J_URI and self.DB_NEO4J_PASSWORD)
 
+    @property
+    def service_keys(self) -> dict[str, str]:
+        keys = {"mcp-database": self.SERVICE_KEY_MCP_DATABASE}
+        return {caller: key.get_secret_value() for caller, key in keys.items() if key is not None}
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
+
     def validate_runtime_security(self) -> None:
+        for caller, key in self.service_keys.items():
+            if not 32 <= len(key) <= 512:
+                raise RuntimeError(f"A chave de serviço de {caller} deve ter entre 32 e 512 caracteres")
         if self.APP_ENVIRONMENT != "production":
             return
         if self.DB_POSTGRES_SSLMODE in {"disable", "allow", "prefer"}:
             raise RuntimeError("DB_POSTGRES_SSLMODE=require ou superior é obrigatório em produção")
         if self.DOCS_ENABLED:
             raise RuntimeError("DOCS_ENABLED deve ser false em produção")
-        if self.RECOMMENDATION_API_KEY is None:
-            raise RuntimeError("RECOMMENDATION_API_KEY é obrigatória em produção")
-        if not 32 <= len(self.RECOMMENDATION_API_KEY.get_secret_value()) <= 512:
+        if not self.service_keys and self.RECOMMENDATION_API_KEY is None:
+            raise RuntimeError("SERVICE_KEY_MCP_DATABASE é obrigatória em produção")
+        if self.RECOMMENDATION_API_KEY is not None and not (
+            32 <= len(self.RECOMMENDATION_API_KEY.get_secret_value()) <= 512
+        ):
             raise RuntimeError("RECOMMENDATION_API_KEY deve ter entre 32 e 512 caracteres em produção")
 
 

@@ -1,76 +1,59 @@
-import pytest
+import asyncio
 
-from app.errors import GraphUnavailableError, SnapshotUnavailableError
-from tests.factories import VERSION
-from tests.fakes import FakeGraph, FakePostgres, FakeResult
-
-
-def healthy_graph() -> FakeGraph:
-    return FakeGraph(
-        handler=lambda query, parameters: FakeResult(
-            single_return={"active_version": VERSION, "snapshot_age_seconds": 120}
-        )
-    )
+from app.version import VERSION
+from tests.fakes import FakeGraph, FakePostgres
 
 
-def test_liveness_never_touches_the_dependencies(client):
-    response = client.get("/health/live")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "alive"}
-
-
-def test_readiness_reports_a_healthy_graph(client, wired):
-    wired[0].handler = healthy_graph().handler
-
-    response = client.get("/health/ready")
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "status": "ready",
-        "postgres": "connected",
-        "graph": "ready",
-        "active_sync_version": VERSION,
-        "snapshot_age_seconds": 120,
-    }
-
-
-@pytest.mark.parametrize(
-    ("error", "expected"),
-    [
-        (SnapshotUnavailableError("sem snapshot"), "no_snapshot"),
-        (GraphUnavailableError("fora do ar"), "unavailable"),
-    ],
-)
-def test_readiness_stays_ready_when_the_graph_is_degraded(client, wired, error, expected):
-    wired[0].error = error
-
-    response = client.get("/health/ready")
-
-    assert response.status_code == 200
-    assert response.json()["graph"] == expected
-    assert response.json()["active_sync_version"] is None
-
-
-def test_readiness_reports_a_graph_that_is_not_configured(client, wired):
-    wired[0].configured = False
-
-    response = client.get("/health/ready")
-
-    assert response.status_code == 200
-    assert response.json()["graph"] == "disabled"
-
-
-def test_readiness_fails_only_when_postgres_is_down(client, graph):
+def override(postgres):
     from app.dependencies import get_graph, get_postgres
     from app.main import app
 
-    app.dependency_overrides[get_graph] = lambda: graph
-    app.dependency_overrides[get_postgres] = lambda: FakePostgres(error=OSError("recusou"))
+    app.dependency_overrides[get_graph] = lambda: FakeGraph(error=AssertionError("o pronto não usa o grafo"))
+    app.dependency_overrides[get_postgres] = lambda: postgres
+    return app
+
+
+def test_health_never_touches_the_dependencies_and_reports_the_version(client):
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "UP", "version": VERSION}
+
+
+def test_ready_is_up_when_postgres_answers_whatever_the_graph_state(client):
+    app = override(FakePostgres())
     try:
-        response = client.get("/health/ready")
+        response = client.get("/ready")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "UP"}
+
+
+def test_ready_is_down_without_details_when_postgres_fails(client):
+    app = override(FakePostgres(error=OSError("recusou")))
+    try:
+        response = client.get("/ready")
     finally:
         app.dependency_overrides.clear()
 
     assert response.status_code == 503
-    assert "recusou" not in response.text
+    assert response.json() == {"status": "DOWN"}
+
+
+def test_ready_gives_up_when_postgres_hangs(client, monkeypatch):
+    from app import health
+
+    async def hang(postgres):
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(health, "_ping", hang)
+    monkeypatch.setattr(health, "READY_TIMEOUT_SECONDS", 0.01)
+    app = override(FakePostgres())
+    try:
+        response = client.get("/ready")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
