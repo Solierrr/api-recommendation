@@ -1,8 +1,8 @@
-fastapi==0.141.1
+fastapi==0.146.0
 uvicorn[standard]==0.54.0
-neo4j==6.3.1
-asyncpg==0.31.0
-pydantic==2.13.5
-pydantic-settings==2.15.0
-python-dotenv==1.2.3
-tzdata==2026.4
+neo4j==6.4.1
+asyncpg==0.32.0
+pydantic==2.14.1
+pydantic-settings==2.16.0
+python-dotenv==1.2.4
+tzdata==2026.5
