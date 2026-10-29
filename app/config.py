@@ -22,12 +22,17 @@ class Settings(BaseSettings):
     RECOMMENDATION_POOL_LIMIT: int = Field(default=500, ge=10, le=5000)
     PUBLIC_CACHE_SECONDS: int = Field(default=300, ge=0, le=86400)
     PUBLIC_STALE_IF_ERROR_SECONDS: int = Field(default=86400, ge=0, le=604800)
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     @property
     def graph_configured(self) -> bool:
