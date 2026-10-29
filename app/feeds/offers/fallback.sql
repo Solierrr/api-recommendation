@@ -1,27 +1,27 @@
 WITH active_subscriptions AS (
     SELECT
-        fk_supplier,
+        supplier_id,
         BOOL_OR(
             status = 'PAID'
-            AND (end_date IS NULL OR end_date > CURRENT_TIMESTAMP)
+            AND (ends_at IS NULL OR ends_at > CURRENT_TIMESTAMP)
         ) AS subscription_active
     FROM subscription
-    GROUP BY fk_supplier
+    GROUP BY supplier_id
 ),
 stock AS (
-    SELECT fk_supplier, fk_model, SUM(quantity)::integer AS quantity
+    SELECT supplier_id, model_id, SUM(quantity)::integer AS quantity
     FROM inventory
-    GROUP BY fk_supplier, fk_model
+    GROUP BY supplier_id, model_id
 ),
 accepted_usage AS (
     SELECT
-        proposal_item.fk_offer,
+        proposal_item.offer_id,
         COALESCE(SUM(proposal_item.quantity), 0)::integer AS accepted_proposal_quantity
     FROM proposal_item
     JOIN proposal
-      ON proposal.id = proposal_item.fk_proposal
+      ON proposal.id = proposal_item.proposal_id
     WHERE proposal.status = 'ACCEPTED'
-    GROUP BY proposal_item.fk_offer
+    GROUP BY proposal_item.offer_id
 ),
 best_value AS (
     SELECT
@@ -30,7 +30,7 @@ best_value AS (
         company.trade_name AS supplier_trade_name,
         model.id::text AS model_id,
         brand.name AS brand,
-        model.model AS model,
+        model.model_name AS model,
         model.power_wp::double precision AS power_wp,
         model.efficiency::double precision AS efficiency,
         (model.width * model.length)::double precision AS dimension,
@@ -41,21 +41,21 @@ best_value AS (
         (offer.unit_price / model.power_wp)::double precision AS price_per_wp
     FROM offer
     JOIN model
-      ON model.id = offer.fk_model
+      ON model.id = offer.model_id
     JOIN brand
-      ON brand.id = model.fk_brand
+      ON brand.id = model.brand_id
     JOIN supplier
-      ON supplier.id = offer.fk_supplier
+      ON supplier.id = offer.supplier_id
     JOIN company
-      ON company.id = supplier.fk_company
+      ON company.id = supplier.company_id
     JOIN stock
-      ON stock.fk_supplier = offer.fk_supplier
-     AND stock.fk_model = offer.fk_model
+      ON stock.supplier_id = offer.supplier_id
+     AND stock.model_id = offer.model_id
     JOIN active_subscriptions
-      ON active_subscriptions.fk_supplier = supplier.id
+      ON active_subscriptions.supplier_id = supplier.id
      AND active_subscriptions.subscription_active IS TRUE
     LEFT JOIN accepted_usage
-      ON accepted_usage.fk_offer = offer.id
+      ON accepted_usage.offer_id = offer.id
     WHERE model.status = 'APPROVED'
       AND model.power_wp > 0
       AND model.efficiency >= 0
@@ -71,8 +71,8 @@ best_value AS (
       )
       AND stock.quantity > 0
       AND (
-          offer.expiration_date IS NULL
-          OR offer.expiration_date > CURRENT_TIMESTAMP
+          offer.expires_at IS NULL
+          OR offer.expires_at > CURRENT_TIMESTAMP
       )
     ORDER BY offer.unit_price / model.power_wp, model.efficiency DESC, offer.id
     LIMIT $1
