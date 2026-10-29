@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     FALLBACK_POOL_SIZE: int = Field(default=30, ge=1, le=500)
     PUBLIC_CACHE_SECONDS: int = Field(default=300, ge=0, le=86400)
     PUBLIC_STALE_IF_ERROR_SECONDS: int = Field(default=86400, ge=0, le=604800)
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -49,6 +50,10 @@ class Settings(BaseSettings):
     @property
     def postgres_dsn(self) -> str:
         return f"postgresql://{self.DB_POSTGRES_HOST}:{self.DB_POSTGRES_PORT}/{self.DB_POSTGRES_CORE}"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     @property
     def graph_configured(self) -> bool:
