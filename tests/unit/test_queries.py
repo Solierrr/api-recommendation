@@ -26,7 +26,7 @@ CORE_TABLES = {
     "technical_service",
     "technician",
     "technician_affiliation",
-    "users",
+    "user_account",
 }
 
 

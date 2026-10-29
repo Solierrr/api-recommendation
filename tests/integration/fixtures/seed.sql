@@ -1,8 +1,8 @@
 TRUNCATE
     proposal_item, proposal, service_executor, professional_review, technical_service,
     technical_project, local_unit, requester, inventory, offer, model, subscription,
-    company_plans, technician_affiliation, shift, certification, professional_registration,
-    technician, person, users, supplier, company, geolocalization, address, profession,
+    company_plan, technician_affiliation, shift, certification, professional_registration,
+    technician, person, user_account, supplier, company, geolocation, address, profession,
     contact, business_contact
 CASCADE;
 
@@ -10,111 +10,111 @@ INSERT INTO address (id, state, city, zip_code, street) VALUES
     ('00000000-0000-0000-0000-0000000000a1', 'SP', 'Sao Paulo', '01001000', 'Rua A'),
     ('00000000-0000-0000-0000-0000000000a2', 'RJ', 'Rio de Janeiro', '20010000', 'Rua B');
 
-INSERT INTO geolocalization (id, fk_address, latitude, longitude) VALUES
+INSERT INTO geolocation (id, address_id, latitude, longitude) VALUES
     ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1', -23.5505200, -46.6333100),
     ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a2', -22.9068000, -43.1729000),
     ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000a2', -22.9100000, -43.1800000);
 
-INSERT INTO company (id, status, type, fk_address, cnpj, trade_name, corporate_name, slug) VALUES
+INSERT INTO company (id, status, type, address_id, cnpj, trade_name, corporate_name, slug) VALUES
     ('00000000-0000-0000-0000-0000000000c1', 'APPROVED', 'SUPPLIER', '00000000-0000-0000-0000-0000000000a1', '11111111000101', 'Solar Forte', 'Solar Forte LTDA', 'solar-forte'),
-    ('00000000-0000-0000-0000-0000000000c2', 'APPROVED', 'DEMANDANT', '00000000-0000-0000-0000-0000000000a2', '22222222000102', 'Casa Verde', 'Casa Verde LTDA', 'casa-verde'),
+    ('00000000-0000-0000-0000-0000000000c2', 'APPROVED', 'REQUESTER', '00000000-0000-0000-0000-0000000000a2', '22222222000102', 'Casa Verde', 'Casa Verde LTDA', 'casa-verde'),
     ('00000000-0000-0000-0000-0000000000c3', 'APPROVED', 'SUPPLIER', NULL, '33333333000103', 'Painel Parado', 'Painel Parado LTDA', 'painel-parado');
 
-INSERT INTO supplier (id, fk_company, status, business_type) VALUES
+INSERT INTO supplier (id, company_id, status, business_type) VALUES
     ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c1', 'ACTIVE', 'DISTRIBUTOR'),
     ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000c3', 'SUSPENDED', 'DISTRIBUTOR');
 
-INSERT INTO company_plans (id, name, value, cycle) VALUES
+INSERT INTO company_plan (id, name, price, cycle) VALUES
     ('00000000-0000-0000-0000-0000000000e1', 'Basico', 99, 'MONTHLY');
 
-INSERT INTO subscription (id, fk_supplier, fk_plan, status, start_date, end_date) VALUES
+INSERT INTO subscription (id, supplier_id, company_plan_id, status, starts_at, ends_at) VALUES
     ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000e1', 'PAID', now() - interval '30 days', NULL),
     ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000e1', 'PAID', now() - interval '30 days', NULL);
 
-INSERT INTO brand (id, name, normalized_name, visibility, legacy) VALUES
+INSERT INTO brand (id, name, normalized_name, visibility, is_legacy) VALUES
     ('00000000-0000-0000-0000-0000000000b1', 'Canadian', 'canadian', 'PUBLIC', FALSE),
     ('00000000-0000-0000-0000-0000000000b2', 'Rejeitada', 'rejeitada', 'PUBLIC', FALSE),
     ('00000000-0000-0000-0000-0000000000b3', 'Invalida', 'invalida', 'PUBLIC', FALSE);
 
-INSERT INTO model (id, fk_brand, model, power_wp, efficiency, type, width, length, weight, status) VALUES
+INSERT INTO model (id, brand_id, model_name, power_wp, efficiency, type, width, length, weight, status) VALUES
     ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1', 'CS7N', 550, 21.5, 'MONOCRYSTALLINE', 1.1, 2.3, 28, 'APPROVED'),
     ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000b2', 'X1', 400, 18, 'POLYCRYSTALLINE', 1.0, 1.7, 22, 'REJECTED'),
     ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000b3', 'Y2', 450, 150, 'THIN_FILM', 1.0, 1.7, 22, 'APPROVED');
 
-INSERT INTO offer (id, fk_supplier, fk_model, unit_price, availability, expiration_date, slug) VALUES
+INSERT INTO offer (id, supplier_id, model_id, unit_price, availability, expires_at, slug) VALUES
     ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f1', 750.55, 40, NULL, 'oferta-1'),
     ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f2', 500, 10, NULL, 'oferta-2'),
     ('00000000-0000-0000-0000-000000000103', '00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000f1', 700, 10, NULL, 'oferta-3'),
     ('00000000-0000-0000-0000-000000000104', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f3', 600, 10, NULL, 'oferta-4');
 
-INSERT INTO inventory (id, fk_supplier, fk_model, quantity) VALUES
+INSERT INTO inventory (id, supplier_id, model_id, quantity) VALUES
     ('00000000-0000-0000-0000-000000000111', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f1', 15),
     ('00000000-0000-0000-0000-000000000113', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f2', 10),
     ('00000000-0000-0000-0000-000000000114', '00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000f1', 10),
     ('00000000-0000-0000-0000-000000000115', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f3', 10);
 
-INSERT INTO requester (id, fk_company) VALUES
+INSERT INTO requester (id, company_id) VALUES
     ('00000000-0000-0000-0000-000000000121', '00000000-0000-0000-0000-0000000000c2');
 
-INSERT INTO local_unit (id, fk_requester, fk_address, complement, location_type) VALUES
+INSERT INTO local_unit (id, requester_id, address_id, complement, location_type) VALUES
     ('00000000-0000-0000-0000-000000000131', '00000000-0000-0000-0000-000000000121', '00000000-0000-0000-0000-0000000000a1', 'Bloco 1', 'HOUSE'),
     ('00000000-0000-0000-0000-000000000132', '00000000-0000-0000-0000-000000000121', '00000000-0000-0000-0000-0000000000a2', NULL, 'BUILDING');
 
-INSERT INTO proposal (id, fk_requester, status) VALUES
+INSERT INTO proposal (id, requester_id, status) VALUES
     ('00000000-0000-0000-0000-000000000141', '00000000-0000-0000-0000-000000000121', 'ACCEPTED');
 
-INSERT INTO proposal_item (id, fk_proposal, fk_offer, quantity) VALUES
+INSERT INTO proposal_item (id, proposal_id, offer_id, quantity) VALUES
     ('00000000-0000-0000-0000-000000000142', '00000000-0000-0000-0000-000000000141', '00000000-0000-0000-0000-000000000101', 3);
 
-INSERT INTO users (id, auth_id, username, active) VALUES
+INSERT INTO user_account (id, auth_id, username, is_active) VALUES
     ('00000000-0000-0000-0000-000000000151', '00000000-0000-0000-0000-0000000001a1', 'tecnica_ana', true),
     ('00000000-0000-0000-0000-000000000152', '00000000-0000-0000-0000-0000000001a2', 'tecnico_inativo', false),
     ('00000000-0000-0000-0000-000000000153', '00000000-0000-0000-0000-0000000001a3', 'tecnico_novo', true),
     ('00000000-0000-0000-0000-000000000154', '00000000-0000-0000-0000-0000000001a4', 'cliente_caio', true);
 
-INSERT INTO person (id, fk_users, name, cpf, birth_date) VALUES
+INSERT INTO person (id, user_id, name, cpf, birth_date) VALUES
     ('00000000-0000-0000-0000-000000000161', '00000000-0000-0000-0000-000000000151', 'Ana Tecnica', '11111111111', '1990-01-01'),
     ('00000000-0000-0000-0000-000000000162', '00000000-0000-0000-0000-000000000152', 'Ivo Inativo', '22222222222', '1985-05-05'),
     ('00000000-0000-0000-0000-000000000163', '00000000-0000-0000-0000-000000000153', 'Novo Tecnico', '33333333333', '1995-09-09');
 
-INSERT INTO technician (id, fk_person, crea, slug, status) VALUES
+INSERT INTO technician (id, person_id, crea, slug, status) VALUES
     ('00000000-0000-0000-0000-000000000171', '00000000-0000-0000-0000-000000000161', 'CREA-SP 123', 'ana-tecnica', 'APPROVED'),
     ('00000000-0000-0000-0000-000000000172', '00000000-0000-0000-0000-000000000162', 'CREA-RJ 456', 'ivo-inativo', 'APPROVED'),
     ('00000000-0000-0000-0000-000000000173', '00000000-0000-0000-0000-000000000163', 'CREA-MG 789', 'novo-tecnico', 'UNDER_ANALYSIS');
 
-INSERT INTO profession (id, name, accept_emergency_call, requires_registration) VALUES
+INSERT INTO profession (id, name, is_emergency_call_accepted, is_registration_required) VALUES
     ('00000000-0000-0000-0000-000000000181', 'Engenheiro Eletricista', true, true),
     ('00000000-0000-0000-0000-000000000182', 'Instalador', false, NULL),
     ('00000000-0000-0000-0000-000000000183', '   ', false, false);
 
-INSERT INTO professional_registration (id, fk_technician, fk_profession, council, number, expiration_date) VALUES
+INSERT INTO professional_registration (id, technician_id, profession_id, council, number, expires_at) VALUES
     ('00000000-0000-0000-0000-000000000191', '00000000-0000-0000-0000-000000000171', '00000000-0000-0000-0000-000000000181', 'CREA', '123', NULL),
     ('00000000-0000-0000-0000-000000000192', '00000000-0000-0000-0000-000000000171', '00000000-0000-0000-0000-000000000182', 'CFT', '77', now() - interval '1 day'),
     ('00000000-0000-0000-0000-000000000193', '00000000-0000-0000-0000-000000000172', '00000000-0000-0000-0000-000000000181', 'CREA', '456', NULL);
 
-INSERT INTO certification (id, fk_technician, type, information, validity) VALUES
+INSERT INTO certification (id, technician_id, type, information, valid_until_at) VALUES
     ('00000000-0000-0000-0000-0000000001b1', '00000000-0000-0000-0000-000000000171', 'NR-10', 'curso', NULL),
     ('00000000-0000-0000-0000-0000000001b2', '00000000-0000-0000-0000-000000000171', 'NR-35', 'curso', now() - interval '10 days');
 
-INSERT INTO technician_affiliation (id, fk_company, fk_technician, affiliation_type, active) VALUES
+INSERT INTO technician_affiliation (id, company_id, technician_id, affiliation_type, is_active) VALUES
     ('00000000-0000-0000-0000-0000000001c1', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000171', 'AFFILIATED', true),
     ('00000000-0000-0000-0000-0000000001c2', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000172', 'PARTNER', true);
 
-INSERT INTO shift (id, fk_technician, day_week, start_date, end_date) VALUES
+INSERT INTO shift (id, technician_id, day_week, starts_at, ends_at) VALUES
     ('00000000-0000-0000-0000-0000000001d1', '00000000-0000-0000-0000-000000000171', 'MONDAY', '2026-01-05 08:00:00', '2026-01-05 17:00:00'),
     ('00000000-0000-0000-0000-0000000001d2', '00000000-0000-0000-0000-000000000172', 'TUESDAY', '2026-01-06 08:00:00', '2026-01-06 17:00:00');
 
-INSERT INTO technical_project (id, fk_requester, fk_local_unit, status, owner_company_id) VALUES
+INSERT INTO technical_project (id, requester_id, local_unit_id, status, owner_company_id) VALUES
     ('00000000-0000-0000-0000-0000000001e1', '00000000-0000-0000-0000-000000000121', '00000000-0000-0000-0000-000000000131', 'IN_PROGRESS', '00000000-0000-0000-0000-0000000000c2');
 
-INSERT INTO technical_service (id, fk_technical_project, purpose, status, scheduled_date, end_date) VALUES
+INSERT INTO technical_service (id, technical_project_id, purpose, status, scheduled_at, ends_at) VALUES
     ('00000000-0000-0000-0000-0000000001f1', '00000000-0000-0000-0000-0000000001e1', '  Instalacao Solar ', 'COMPLETED', NULL, now()),
     ('00000000-0000-0000-0000-0000000001f2', '00000000-0000-0000-0000-0000000001e1', 'Manutencao', 'OPEN', now() + interval '3 days', NULL);
 
-INSERT INTO service_executor (id, fk_service, fk_technician_affiliation, function) VALUES
+INSERT INTO service_executor (id, technical_service_id, technician_affiliation_id, function) VALUES
     ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-0000000001f1', '00000000-0000-0000-0000-0000000001c1', 'LEAD'),
     ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-0000000001f2', '00000000-0000-0000-0000-0000000001c1', 'SUPPORT'),
     ('00000000-0000-0000-0000-000000000203', '00000000-0000-0000-0000-0000000001f1', '00000000-0000-0000-0000-0000000001c2', 'SUPPORT');
 
-INSERT INTO professional_review (id, fk_professional, fk_reviewer, fk_service, rating, active) VALUES
+INSERT INTO professional_review (id, technician_id, reviewer_user_id, technical_service_id, rating, is_active) VALUES
     ('00000000-0000-0000-0000-000000000211', '00000000-0000-0000-0000-000000000171', '00000000-0000-0000-0000-000000000154', '00000000-0000-0000-0000-0000000001f1', 4.5, true);
