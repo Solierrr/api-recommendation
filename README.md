@@ -46,6 +46,9 @@ sem snapshot ativo ou não configurado, as rotas de feed respondem `503` com o c
 - **Feeds públicos**, `GET /public/feeds/{professionals|offers|suppliers}` não exigem chave, leem o
   grafo com a estratégia padrão de cada feed e respondem com `Cache-Control: public` (e
   `stale-if-error`) para que a Cloudflare atenda os anônimos sem chegar à origem.
+  O navegador só os lê a partir das origens de `CORS_ALLOWED_ORIGINS` (lista separada por vírgula,
+  sem credenciais e sem `*`); o header `X-Recommendation-Key` não é aceito em chamadas CORS. Com a
+  Cloudflare na frente, use uma única origem por ambiente ou inclua `Origin` na chave de cache.
 - **Sem caminho alternativo**, quando o grafo está fora do ar, sem snapshot ou não configurado, todas as rotas
   de feed respondem `503` com `FEED_UNAVAILABLE`.
 - **Somente leitura**, o serviço não escreve no Neo4j. O grafo é construído pelo
