@@ -47,6 +47,9 @@ elegíveis lida direto do PostgreSQL.
 - **Feeds públicos**, `GET /public/feeds/{professionals|offers|suppliers}` não exigem chave, nunca
   tocam o Neo4j e respondem com `Cache-Control: public` (e `stale-if-error`) para que a Cloudflare
   atenda os anônimos sem chegar à origem.
+  O navegador só os lê a partir das origens de `CORS_ALLOWED_ORIGINS` (lista separada por vírgula,
+  sem credenciais e sem `*`); o header `X-Recommendation-Key` não é aceito em chamadas CORS. Com a
+  Cloudflare na frente, use uma única origem por ambiente ou inclua `Origin` na chave de cache.
 - **Fallback SQL**, quando o grafo está fora do ar, sem snapshot ou não configurado, os feeds
   autenticados respondem com `source: "fallback"` em vez de erro: uma amostra aleatória entre os
   melhores itens elegíveis lidos do PostgreSQL, sem aplicar a estratégia pedida.
