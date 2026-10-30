@@ -73,7 +73,7 @@ def test_professionals_feed_reports_an_unknown_profession(client, wired):
     response = client.get("/feeds/professionals", params={"profession_id": PROFESSION_ID})
 
     assert response.status_code == 404
-    assert response.json()["detail"]["code"] == "PROFESSION_NOT_FOUND"
+    assert response.json()["errorCode"] == "PROFESSION_NOT_FOUND"
 
 
 def test_offers_feed_ranks_graph_candidates(client, wired):
@@ -95,7 +95,7 @@ def test_offers_feed_reports_an_unknown_local_unit(client, wired):
     response = client.get("/feeds/offers", params={"local_unit_id": UNIT_ID})
 
     assert response.status_code == 404
-    assert response.json()["detail"]["code"] == "LOCAL_UNIT_NOT_FOUND"
+    assert response.json()["errorCode"] == "LOCAL_UNIT_NOT_FOUND"
 
 
 @pytest.mark.parametrize("feed", ["offers", "suppliers"])
@@ -107,7 +107,7 @@ def test_nearest_strategies_require_a_local_unit(client, wired, feed):
     response = client.get(f"/feeds/{feed}", params={"strategy": strategy})
 
     assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "LOCAL_UNIT_REQUIRED"
+    assert response.json()["errorCode"] == "LOCAL_UNIT_REQUIRED"
 
 
 def test_suppliers_feed_ranks_graph_candidates(client, wired):
@@ -134,7 +134,7 @@ def test_a_candidate_pool_above_the_limit_is_refused(client, wired, monkeypatch)
     response = client.get("/feeds/offers")
 
     assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "CANDIDATE_POOL_TOO_LARGE"
+    assert response.json()["errorCode"] == "CANDIDATE_POOL_TOO_LARGE"
 
 
 @pytest.mark.parametrize(
@@ -215,7 +215,7 @@ def test_feeds_answer_503_when_neither_the_graph_nor_the_database_respond(client
         app.dependency_overrides.clear()
 
     assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "FEED_UNAVAILABLE"
+    assert response.json()["errorCode"] == "FEED_UNAVAILABLE"
 
 
 def test_unexpected_errors_become_a_generic_500(client, wired):
@@ -225,7 +225,7 @@ def test_unexpected_errors_become_a_generic_500(client, wired):
     response = client.get("/feeds/offers")
 
     assert response.status_code == 500
-    assert response.json()["detail"]["code"] == "RECOMMENDATION_FAILED"
+    assert response.json()["errorCode"] == "INTERNAL_ERROR"
     assert "segredo" not in response.text
 
 
