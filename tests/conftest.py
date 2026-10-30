@@ -6,6 +6,7 @@ os.environ["APP_ENVIRONMENT"] = "test"
 os.environ["DOCS_ENABLED"] = "true"
 for name in ("DB_NEO4J_URI", "DB_NEO4J_PASSWORD", "DB_NEO4J_FEED", "RECOMMENDATION_API_KEY"):
     os.environ.pop(name, None)
+os.environ["SERVICE_KEY_MCP_DATABASE"] = "m" * 40
 os.environ["DB_POSTGRES_HOST"] = "localhost"
 os.environ["DB_POSTGRES_PORT"] = "5432"
 os.environ["DB_POSTGRES_CORE"] = "test"
@@ -20,12 +21,13 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.dependencies import get_graph, get_postgres  # noqa: E402
 from app.main import app  # noqa: E402
+from tests.factories import SERVICE_KEY  # noqa: E402
 from tests.fakes import FakeGraph, FakePostgres  # noqa: E402
 
 
 @pytest.fixture
 def client():
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, raise_server_exceptions=False, headers={"X-Service-Key": SERVICE_KEY})
 
 
 @pytest.fixture

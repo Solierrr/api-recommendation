@@ -37,9 +37,17 @@ e o PostgreSQL do `api-core`, usado como rede de segurança quando o grafo não 
 - **Feeds públicos sanitizados**, `/public/feeds/*` usam modelos próprios, só com campos que podem
   ser expostos a anônimos, e sempre são servidos pelo SQL. As respostas carregam
   `Cache-Control: public, max-age=…, stale-if-error=…`.
-- **Autenticação por uma única chave**, `X-Recommendation-Key` (`app/security.py`), comparada com
-  `hmac.compare_digest`. Em produção, `Settings.validate_runtime_security()` exige a chave com 32 a
-  512 caracteres, `sslmode` seguro no PostgreSQL e Swagger desligado. O Neo4j do cluster é acessado
+- **Chave de serviço por chamador**, `X-Service-Key` (`app/security.py`), comparada com
+  `hmac.compare_digest` contra `SERVICE_KEY_<CHAMADOR>`; cada rota declara os chamadores aceitos
+  (`require_caller`), com 401 para chave ausente ou inválida e 403 para chamador não aceito. Sem
+  nenhuma chave configurada, tudo é recusado. Durante a troca, o header antigo
+  `X-Recommendation-Key` (`RECOMMENDATION_API_KEY`) ainda identifica o `mcp-database`.
+  `Settings.validate_runtime_security()` recusa a partida com chave de serviço fora de 32 a 512
+  caracteres e, em produção, exige uma chave, `sslmode` seguro no PostgreSQL e Swagger desligado.
+- **Erros no contrato da organização**, `app/errors.py` responde todo erro em
+  `application/problem+json` (`type`, `title`, `status`, `errorCode`, `detail`, `instance`,
+  `timestamp`); `app/openapi.py` monta o contrato, aplica o `ProblemDetail` às respostas de erro e
+  remove as rotas `/internal/` do que é servido em `/openapi.json`. O Neo4j do cluster é acessado
   por `bolt://` interno, sem TLS.
 - **Segurança do container**, o `Dockerfile` usa `python:3.12-slim`, usuário não-root e instala as
   dependências com `--require-hashes` a partir do `requirements.lock`.
@@ -60,21 +68,27 @@ e o PostgreSQL do `api-core`, usado como rede de segurança quando o grafo não 
 │   ├── config.py                 # Configurações (variáveis de ambiente)
 │   ├── database.py               # PostgresService e GraphService
 │   ├── dependencies.py           # Injeção dos serviços de banco
-│   ├── errors.py
-│   ├── health.py                 # /health/live e /health/ready
-│   ├── main.py                   # Ponto de entrada (lifespan, routers, tratamento de erros)
+│   ├── errors.py                 # ProblemDetail e handlers de erro
+│   ├── health.py                 # /health e /ready
+│   ├── main.py                   # Ponto de entrada (lifespan, routers, CORS, metadados do contrato)
+│   ├── openapi.py                # Montagem do contrato OpenAPI
 │   ├── queries.py                # Leitura dos arquivos .cypher e .sql
-│   └── security.py
+│   ├── security.py               # X-Service-Key por chamador
+│   └── version.py                # Versão lida do version.txt
 ├── http/                         # Coleção Bruno
+├── scripts/
+│   └── export_openapi.py         # Gera o openapi.yaml (make openapi)
 ├── tests/
 │   ├── unit/
 │   └── integration/              # Neo4j e PostgreSQL reais (opt-in)
 ├── Dockerfile
+├── openapi.yaml                  # Contrato exportado, conferido no CI
 ├── pyproject.toml                # Configuração de ruff, coverage e mypy
 ├── pytest.ini
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── requirements.lock
 ├── requirements-ci.lock
-└── sonar-project.properties
+├── sonar-project.properties
+└── version.txt                   # Versão do release, mantida pelo release-please
 ```

@@ -6,7 +6,13 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "package-name": "api-recommendation"
+      "package-name": "api-recommendation",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "openapi.yaml"
+        }
+      ]
     }
   }
 }

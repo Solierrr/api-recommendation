@@ -264,16 +264,11 @@ def test_public_feeds_use_sql_only_with_cache_headers_and_a_sanitized_shape(
     assert graph.session is None
 
 
-def test_public_feeds_do_not_need_the_recommendation_key(client, wired, monkeypatch):
-    from pydantic import SecretStr
-
-    from app.config import settings
-
-    monkeypatch.setattr(settings, "RECOMMENDATION_API_KEY", SecretStr("k" * 40))
+def test_public_feeds_do_not_need_the_service_key(client, wired):
     wired[1].connection_instance.rows = [fallback_offer(1)]
 
-    public = client.get("/public/feeds/offers")
-    private = client.get("/feeds/offers")
+    public = client.get("/public/feeds/offers", headers={"X-Service-Key": ""})
+    private = client.get("/feeds/offers", headers={"X-Service-Key": ""})
 
     assert public.status_code == 200
     assert private.status_code == 401
