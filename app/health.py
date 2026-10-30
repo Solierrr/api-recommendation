@@ -1,68 +1,63 @@
+import asyncio
 import logging
 from typing import Annotated, Literal
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
-from app.database import GraphService, PostgresService
-from app.dependencies import get_graph, get_postgres
-from app.errors import GraphUnavailableError, SnapshotUnavailableError
-from app.feeds import graph as graph_queries
+from app.database import PostgresService
+from app.dependencies import get_postgres
+from app.version import VERSION
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["health"])
+READY_TIMEOUT_SECONDS = 2
 
-GraphStatus = Literal["ready", "unavailable", "no_snapshot", "disabled"]
-
-
-class LivenessResponse(BaseModel):
-    status: Literal["alive"]
+router = APIRouter(tags=["Saúde"])
 
 
-class ReadinessResponse(BaseModel):
-    status: Literal["ready"]
-    postgres: Literal["connected"]
-    graph: GraphStatus
-    active_sync_version: UUID | None = None
-    snapshot_age_seconds: int | None = None
+class HealthResponse(BaseModel):
+    status: Literal["UP"] = Field(description="O processo está vivo.")
+    version: str = Field(description="Versão do release em execução.", examples=["0.3.0"])
 
 
-async def _graph_status(graph: GraphService) -> dict:
-    if not graph.configured:
-        return {"graph": "disabled"}
+class ReadyResponse(BaseModel):
+    status: Literal["UP", "DOWN"] = Field(description="UP quando o PostgreSQL responde; DOWN caso contrário.")
+
+
+async def _ping(postgres: PostgresService) -> None:
+    async with postgres.connection() as connection:
+        await connection.fetchval("SELECT 1")
+
+
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Indica se o processo está vivo",
+    description="Não consulta nenhuma dependência.",
+    operation_id="getHealth",
+    openapi_extra={"security": [], "x-error-codes": ["INTERNAL_ERROR"]},
+)
+async def health():
+    return {"status": "UP", "version": VERSION}
+
+
+@router.get(
+    "/ready",
+    response_model=ReadyResponse,
+    summary="Indica se o serviço está pronto para atender",
+    description=(
+        "Consulta só o PostgreSQL. O grafo fica de fora: sem ele, os feeds respondem pelo fallback SQL."
+    ),
+    operation_id="getReady",
+    responses={503: {"description": "O PostgreSQL não respondeu.", "model": ReadyResponse}},
+    openapi_extra={"security": [], "x-error-codes": ["INTERNAL_ERROR"]},
+)
+async def ready(postgres: Annotated[PostgresService, Depends(get_postgres)]):
     try:
-        async with graph.read_session() as session:
-            snapshot = await graph_queries.active_snapshot(session)
-    except SnapshotUnavailableError:
-        return {"graph": "no_snapshot"}
-    except GraphUnavailableError:
-        return {"graph": "unavailable"}
-    return {
-        "graph": "ready",
-        "active_sync_version": snapshot["active_version"],
-        "snapshot_age_seconds": snapshot["snapshot_age_seconds"],
-    }
-
-
-@router.get("/health/live", response_model=LivenessResponse)
-async def liveness_check():
-    return {"status": "alive"}
-
-
-@router.get("/health/ready", response_model=ReadinessResponse)
-async def readiness_check(
-    graph: Annotated[GraphService, Depends(get_graph)],
-    postgres: Annotated[PostgresService, Depends(get_postgres)],
-):
-    try:
-        async with postgres.connection() as connection:
-            await connection.fetchval("SELECT 1")
+        await asyncio.wait_for(_ping(postgres), timeout=READY_TIMEOUT_SECONDS)
     except Exception:
         logger.exception("Falha no readiness check do PostgreSQL")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Serviço indisponível: o PostgreSQL não respondeu",
-        ) from None
-    return {"status": "ready", "postgres": "connected", **await _graph_status(graph)}
+        return JSONResponse({"status": "DOWN"}, status_code=503)
+    return {"status": "UP"}

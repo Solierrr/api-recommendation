@@ -21,6 +21,7 @@ RUN python -m pip install \
     --require-hashes \
     --requirement requirements.lock
 
+COPY --chown=app:app version.txt ./version.txt
 COPY --chown=app:app app ./app
 COPY --chown=app:app entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh

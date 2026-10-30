@@ -1,0 +1,15 @@
+meta {
+  name: GET /ready
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/ready
+  body: none
+  auth: none
+}
+
+docs {
+  Readiness: 503 with status DOWN only when Postgres is down. The graph is not checked, because the feeds fall back to SQL.
+}

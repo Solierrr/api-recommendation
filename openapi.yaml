@@ -1,0 +1,1145 @@
+openapi: 3.1.0
+info:
+  title: Solaria — api-recommendation
+  description: 'Motor de feeds da plataforma: recomenda profissionais, ofertas de placas solares e fornecedores para as telas
+    de feed do marketplace. O ranking vem de um grafo no Neo4j, projeção somente leitura do PostgreSQL do api-core; sem o
+    grafo, os feeds respondem com uma amostra dos itens elegíveis lida do PostgreSQL. Os feeds em /feeds/* são chamados por
+    serviço e exigem a chave de serviço do chamador no cabeçalho X-Service-Key; os feeds em /public/feeds/* são abertos e
+    cacheáveis.'
+  contact:
+    name: Solaria
+    url: https://github.com/Solierrr
+  license:
+    name: CC0-1.0
+    url: https://creativecommons.org/publicdomain/zero/1.0/
+  version: 0.3.0 # x-release-please-version
+servers:
+- url: https://api-recommendation-qlml.onrender.com
+  description: QA
+- url: http://localhost:8000
+  description: Local
+paths:
+  /health:
+    get:
+      tags:
+      - Saúde
+      summary: Indica se o processo está vivo
+      description: Não consulta nenhuma dependência.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+      x-error-codes:
+      - INTERNAL_ERROR
+  /ready:
+    get:
+      tags:
+      - Saúde
+      summary: Indica se o serviço está pronto para atender
+      description: 'Consulta só o PostgreSQL. O grafo fica de fora: sem ele, os feeds respondem pelo fallback SQL.'
+      operationId: getReady
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '503':
+          description: O PostgreSQL não respondeu.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+      x-error-codes:
+      - INTERNAL_ERROR
+  /feeds/professionals:
+    get:
+      tags:
+      - Feeds
+      summary: Lista profissionais ranqueados pela estratégia pedida
+      description: 'Chamado por serviço (mcp-database) com a chave no cabeçalho X-Service-Key. Sem o grafo, responde com source=fallback:
+        uma amostra do PostgreSQL, sem aplicar a estratégia.'
+      operationId: getProfessionalsFeed
+      security:
+      - serviceKey: []
+      parameters:
+      - name: strategy
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ProfessionalStrategy'
+          description: Critério de ordenação do feed.
+          default: best_match
+        description: Critério de ordenação do feed.
+      - name: profession_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Filtra pela profissão; precisa existir no snapshot ativo do grafo.
+          title: Profession Id
+        description: Filtra pela profissão; precisa existir no snapshot ativo do grafo.
+      - name: company_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Empresa que vê o feed; ainda não influencia o ranking.
+          title: Company Id
+        description: Empresa que vê o feed; ainda não influencia o ranking.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse_ProfessionalItem_'
+        '401':
+          description: Chave de serviço ausente ou inválida.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Serviço chamador não autorizado nesta rota.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: A profissão não existe no snapshot ativo.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: Parâmetro inválido ou conjunto elegível acima do limite de ranking.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: Nem o grafo nem o PostgreSQL responderam.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - FORBIDDEN
+      - VALIDATION_FAILED
+      - PROFESSION_NOT_FOUND
+      - CANDIDATE_POOL_TOO_LARGE
+      - FEED_UNAVAILABLE
+      - INTERNAL_ERROR
+  /public/feeds/professionals:
+    get:
+      tags:
+      - Feeds públicos
+      summary: Lista uma amostra pública de profissionais
+      description: Aberto, sem chave. Nunca consulta o grafo e responde com Cache-Control público (e stale-if-error) para
+        a Cloudflare atender os anônimos.
+      operationId: getPublicProfessionalsFeed
+      parameters:
+      - name: profession_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Filtra pela profissão; precisa existir no snapshot ativo do grafo.
+          title: Profession Id
+        description: Filtra pela profissão; precisa existir no snapshot ativo do grafo.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicFeedResponse_PublicProfessional_'
+        '422':
+          description: Parâmetro inválido.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: O PostgreSQL não respondeu.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+      x-error-codes:
+      - VALIDATION_FAILED
+      - FEED_UNAVAILABLE
+      - INTERNAL_ERROR
+  /feeds/offers:
+    get:
+      tags:
+      - Feeds
+      summary: Lista ofertas de placas solares ranqueadas pela estratégia pedida
+      description: 'Chamado por serviço (mcp-database) com a chave no cabeçalho X-Service-Key. Sem o grafo, responde com source=fallback:
+        uma amostra do PostgreSQL, sem aplicar a estratégia.'
+      operationId: getOffersFeed
+      security:
+      - serviceKey: []
+      parameters:
+      - name: strategy
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/OfferStrategy'
+          description: Critério de ordenação do feed.
+          default: best_value
+        description: Critério de ordenação do feed.
+      - name: local_unit_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Unidade local de referência para calcular distância; obrigatória na estratégia nearest_available.
+          title: Local Unit Id
+        description: Unidade local de referência para calcular distância; obrigatória na estratégia nearest_available.
+      - name: company_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Empresa que vê o feed; ainda não influencia o ranking.
+          title: Company Id
+        description: Empresa que vê o feed; ainda não influencia o ranking.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse_OfferItem_'
+        '401':
+          description: Chave de serviço ausente ou inválida.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Serviço chamador não autorizado nesta rota.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: A unidade local não existe no snapshot ativo.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: Parâmetro inválido, unidade sem geolocalização única, estratégia sem local_unit_id ou conjunto elegível
+            acima do limite de ranking.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: Nem o grafo nem o PostgreSQL responderam.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - FORBIDDEN
+      - VALIDATION_FAILED
+      - LOCAL_UNIT_REQUIRED
+      - LOCAL_UNIT_NOT_FOUND
+      - LOCAL_UNIT_GEO_REQUIRED
+      - LOCAL_UNIT_GEO_AMBIGUOUS
+      - CANDIDATE_POOL_TOO_LARGE
+      - FEED_UNAVAILABLE
+      - INTERNAL_ERROR
+  /public/feeds/offers:
+    get:
+      tags:
+      - Feeds públicos
+      summary: Lista uma amostra pública de ofertas de placas solares
+      description: Aberto, sem chave. Nunca consulta o grafo e responde com Cache-Control público (e stale-if-error) para
+        a Cloudflare atender os anônimos.
+      operationId: getPublicOffersFeed
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicFeedResponse_PublicOffer_'
+        '503':
+          description: O PostgreSQL não respondeu.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+      x-error-codes:
+      - FEED_UNAVAILABLE
+      - INTERNAL_ERROR
+  /feeds/suppliers:
+    get:
+      tags:
+      - Feeds
+      summary: Lista fornecedores ranqueados pela estratégia pedida
+      description: 'Chamado por serviço (mcp-database) com a chave no cabeçalho X-Service-Key. Sem o grafo, responde com source=fallback:
+        uma amostra do PostgreSQL, sem aplicar a estratégia.'
+      operationId: getSuppliersFeed
+      security:
+      - serviceKey: []
+      parameters:
+      - name: strategy
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/SupplierStrategy'
+          description: Critério de ordenação do feed.
+          default: most_proven
+        description: Critério de ordenação do feed.
+      - name: local_unit_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Unidade local de referência para calcular distância; obrigatória na estratégia nearest.
+          title: Local Unit Id
+        description: Unidade local de referência para calcular distância; obrigatória na estratégia nearest.
+      - name: company_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          description: Empresa que vê o feed; ainda não influencia o ranking.
+          title: Company Id
+        description: Empresa que vê o feed; ainda não influencia o ranking.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse_SupplierItem_'
+        '401':
+          description: Chave de serviço ausente ou inválida.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Serviço chamador não autorizado nesta rota.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: A unidade local não existe no snapshot ativo.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: Parâmetro inválido, unidade sem geolocalização única, estratégia sem local_unit_id ou conjunto elegível
+            acima do limite de ranking.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: Nem o grafo nem o PostgreSQL responderam.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - FORBIDDEN
+      - VALIDATION_FAILED
+      - LOCAL_UNIT_REQUIRED
+      - LOCAL_UNIT_NOT_FOUND
+      - LOCAL_UNIT_GEO_REQUIRED
+      - LOCAL_UNIT_GEO_AMBIGUOUS
+      - CANDIDATE_POOL_TOO_LARGE
+      - FEED_UNAVAILABLE
+      - INTERNAL_ERROR
+  /public/feeds/suppliers:
+    get:
+      tags:
+      - Feeds públicos
+      summary: Lista uma amostra pública de fornecedores
+      description: Aberto, sem chave. Nunca consulta o grafo e responde com Cache-Control público (e stale-if-error) para
+        a Cloudflare atender os anônimos.
+      operationId: getPublicSuppliersFeed
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicFeedResponse_PublicSupplier_'
+        '503':
+          description: O PostgreSQL não respondeu.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          description: Erro interno inesperado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+      x-error-codes:
+      - FEED_UNAVAILABLE
+      - INTERNAL_ERROR
+components:
+  schemas:
+    FeedContext:
+      properties:
+        feed:
+          type: string
+          title: Feed
+        strategy:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Strategy
+        company_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Company Id
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        sync_version:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Sync Version
+      type: object
+      required:
+      - feed
+      - strategy
+      - company_id
+      - generated_at
+      - sync_version
+      title: FeedContext
+    FeedResponse_OfferItem_:
+      properties:
+        source:
+          $ref: '#/components/schemas/FeedSource'
+        context:
+          $ref: '#/components/schemas/FeedContext'
+        items:
+          items:
+            $ref: '#/components/schemas/OfferItem'
+          type: array
+          title: Items
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      type: object
+      required:
+      - source
+      - context
+      - items
+      title: FeedResponse[OfferItem]
+    FeedResponse_ProfessionalItem_:
+      properties:
+        source:
+          $ref: '#/components/schemas/FeedSource'
+        context:
+          $ref: '#/components/schemas/FeedContext'
+        items:
+          items:
+            $ref: '#/components/schemas/ProfessionalItem'
+          type: array
+          title: Items
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      type: object
+      required:
+      - source
+      - context
+      - items
+      title: FeedResponse[ProfessionalItem]
+    FeedResponse_SupplierItem_:
+      properties:
+        source:
+          $ref: '#/components/schemas/FeedSource'
+        context:
+          $ref: '#/components/schemas/FeedContext'
+        items:
+          items:
+            $ref: '#/components/schemas/SupplierItem'
+          type: array
+          title: Items
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      type: object
+      required:
+      - source
+      - context
+      - items
+      title: FeedResponse[SupplierItem]
+    FeedSource:
+      type: string
+      enum:
+      - graph
+      - fallback
+      title: FeedSource
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          const: UP
+          title: Status
+          description: O processo está vivo.
+        version:
+          type: string
+          title: Version
+          description: Versão do release em execução.
+          examples:
+          - 0.3.0
+      type: object
+      required:
+      - status
+      - version
+      title: HealthResponse
+    OfferItem:
+      properties:
+        offer_id:
+          type: string
+          format: uuid
+          title: Offer Id
+        supplier_id:
+          type: string
+          format: uuid
+          title: Supplier Id
+        supplier_trade_name:
+          type: string
+          title: Supplier Trade Name
+        brand:
+          type: string
+          title: Brand
+        model:
+          type: string
+          title: Model
+        power_wp:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Power Wp
+        efficiency:
+          type: number
+          maximum: 100.0
+          minimum: 0.0
+          title: Efficiency
+        unit_price:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Unit Price
+        effective_availability:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Effective Availability
+        rank:
+          type: integer
+          minimum: 1.0
+          title: Rank
+        model_id:
+          type: string
+          format: uuid
+          title: Model Id
+        dimension:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Dimension
+        weight:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Weight
+        accepted_proposal_quantity:
+          type: integer
+          minimum: 0.0
+          title: Accepted Proposal Quantity
+        distance_km:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+          title: Distance Km
+        ranking_value:
+          type: number
+          minimum: 0.0
+          title: Ranking Value
+        ranking_unit:
+          type: string
+          title: Ranking Unit
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+      type: object
+      required:
+      - offer_id
+      - supplier_id
+      - supplier_trade_name
+      - brand
+      - model
+      - power_wp
+      - efficiency
+      - unit_price
+      - effective_availability
+      - rank
+      - model_id
+      - dimension
+      - weight
+      - accepted_proposal_quantity
+      - ranking_value
+      - ranking_unit
+      - reasons
+      title: OfferItem
+    OfferStrategy:
+      type: string
+      enum:
+      - best_value
+      - most_efficient
+      - nearest_available
+      - most_proven
+      title: OfferStrategy
+    ProfessionalItem:
+      properties:
+        technician_id:
+          type: string
+          format: uuid
+          title: Technician Id
+        name:
+          type: string
+          title: Name
+        professions:
+          items:
+            type: string
+          type: array
+          title: Professions
+        average_rating_global:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+          title: Average Rating Global
+        review_count_global:
+          type: integer
+          minimum: 0.0
+          title: Review Count Global
+        completed_service_count_global:
+          type: integer
+          minimum: 0.0
+          title: Completed Service Count Global
+        certification_names:
+          items:
+            type: string
+          type: array
+          title: Certification Names
+        rank:
+          type: integer
+          minimum: 1.0
+          title: Rank
+        assigned_service_count_global:
+          type: integer
+          minimum: 0.0
+          title: Assigned Service Count Global
+        canceled_service_count_global:
+          type: integer
+          minimum: 0.0
+          title: Canceled Service Count Global
+        valid_certification_count:
+          type: integer
+          minimum: 0.0
+          title: Valid Certification Count
+        ranking_value:
+          type: number
+          minimum: 0.0
+          title: Ranking Value
+        ranking_unit:
+          type: string
+          title: Ranking Unit
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+      type: object
+      required:
+      - technician_id
+      - name
+      - professions
+      - average_rating_global
+      - review_count_global
+      - completed_service_count_global
+      - certification_names
+      - rank
+      - assigned_service_count_global
+      - canceled_service_count_global
+      - valid_certification_count
+      - ranking_value
+      - ranking_unit
+      - reasons
+      title: ProfessionalItem
+    ProfessionalStrategy:
+      type: string
+      enum:
+      - top_rated
+      - most_qualified
+      - most_experienced
+      - most_reliable
+      - best_match
+      title: ProfessionalStrategy
+    PublicFeedResponse_PublicOffer_:
+      properties:
+        source:
+          $ref: '#/components/schemas/FeedSource'
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        items:
+          items:
+            $ref: '#/components/schemas/PublicOffer'
+          type: array
+          title: Items
+      type: object
+      required:
+      - source
+      - generated_at
+      - items
+      title: PublicFeedResponse[PublicOffer]
+    PublicFeedResponse_PublicProfessional_:
+      properties:
+        source:
+          $ref: '#/components/schemas/FeedSource'
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        items:
+          items:
+            $ref: '#/components/schemas/PublicProfessional'
+          type: array
+          title: Items
+      type: object
+      required:
+      - source
+      - generated_at
+      - items
+      title: PublicFeedResponse[PublicProfessional]
+    PublicFeedResponse_PublicSupplier_:
+      properties:
+        source:
+          $ref: '#/components/schemas/FeedSource'
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        items:
+          items:
+            $ref: '#/components/schemas/PublicSupplier'
+          type: array
+          title: Items
+      type: object
+      required:
+      - source
+      - generated_at
+      - items
+      title: PublicFeedResponse[PublicSupplier]
+    PublicOffer:
+      properties:
+        offer_id:
+          type: string
+          format: uuid
+          title: Offer Id
+        supplier_id:
+          type: string
+          format: uuid
+          title: Supplier Id
+        supplier_trade_name:
+          type: string
+          title: Supplier Trade Name
+        brand:
+          type: string
+          title: Brand
+        model:
+          type: string
+          title: Model
+        power_wp:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Power Wp
+        efficiency:
+          type: number
+          maximum: 100.0
+          minimum: 0.0
+          title: Efficiency
+        unit_price:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Unit Price
+        effective_availability:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Effective Availability
+      type: object
+      required:
+      - offer_id
+      - supplier_id
+      - supplier_trade_name
+      - brand
+      - model
+      - power_wp
+      - efficiency
+      - unit_price
+      - effective_availability
+      title: PublicOffer
+    PublicProfessional:
+      properties:
+        technician_id:
+          type: string
+          format: uuid
+          title: Technician Id
+        name:
+          type: string
+          title: Name
+        professions:
+          items:
+            type: string
+          type: array
+          title: Professions
+        average_rating_global:
+          type: number
+          maximum: 5.0
+          minimum: 0.0
+          title: Average Rating Global
+        review_count_global:
+          type: integer
+          minimum: 0.0
+          title: Review Count Global
+        completed_service_count_global:
+          type: integer
+          minimum: 0.0
+          title: Completed Service Count Global
+        certification_names:
+          items:
+            type: string
+          type: array
+          title: Certification Names
+      type: object
+      required:
+      - technician_id
+      - name
+      - professions
+      - average_rating_global
+      - review_count_global
+      - completed_service_count_global
+      - certification_names
+      title: PublicProfessional
+    PublicSupplier:
+      properties:
+        supplier_id:
+          type: string
+          format: uuid
+          title: Supplier Id
+        trade_name:
+          type: string
+          title: Trade Name
+        business_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Business Type
+        offer_count:
+          type: integer
+          minimum: 1.0
+          title: Offer Count
+      type: object
+      required:
+      - supplier_id
+      - trade_name
+      - business_type
+      - offer_count
+      title: PublicSupplier
+    ReadyResponse:
+      properties:
+        status:
+          type: string
+          enum:
+          - UP
+          - DOWN
+          title: Status
+          description: UP quando o PostgreSQL responde; DOWN caso contrário.
+      type: object
+      required:
+      - status
+      title: ReadyResponse
+    SupplierItem:
+      properties:
+        supplier_id:
+          type: string
+          format: uuid
+          title: Supplier Id
+        trade_name:
+          type: string
+          title: Trade Name
+        business_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Business Type
+        offer_count:
+          type: integer
+          minimum: 1.0
+          title: Offer Count
+        rank:
+          type: integer
+          minimum: 1.0
+          title: Rank
+        company_id:
+          type: string
+          format: uuid
+          title: Company Id
+        accepted_proposal_quantity:
+          type: integer
+          minimum: 0.0
+          title: Accepted Proposal Quantity
+        distance_km:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+          title: Distance Km
+        ranking_value:
+          type: number
+          minimum: 0.0
+          title: Ranking Value
+        ranking_unit:
+          type: string
+          title: Ranking Unit
+        reasons:
+          items:
+            type: string
+          type: array
+          title: Reasons
+      type: object
+      required:
+      - supplier_id
+      - trade_name
+      - business_type
+      - offer_count
+      - rank
+      - company_id
+      - accepted_proposal_quantity
+      - ranking_value
+      - ranking_unit
+      - reasons
+      title: SupplierItem
+    SupplierStrategy:
+      type: string
+      enum:
+      - most_proven
+      - broadest_catalog
+      - nearest
+      title: SupplierStrategy
+    ProblemFieldError:
+      properties:
+        field:
+          description: Campo ou parâmetro inválido.
+          examples:
+          - profession_id
+          title: Field
+          type: string
+        errorCode:
+          description: Código estável do erro.
+          examples:
+          - VALIDATION_FAILED
+          title: Errorcode
+          type: string
+        detail:
+          description: Explicação para quem depura.
+          examples:
+          - Input should be a valid UUID
+          title: Detail
+          type: string
+      required:
+      - field
+      - errorCode
+      - detail
+      title: ProblemFieldError
+      type: object
+    ProblemDetail:
+      properties:
+        type:
+          description: Sempre about:blank.
+          examples:
+          - about:blank
+          title: Type
+          type: string
+        title:
+          description: O mesmo valor de errorCode.
+          examples:
+          - PROFESSION_NOT_FOUND
+          title: Title
+          type: string
+        status:
+          description: Código HTTP.
+          examples:
+          - 404
+          title: Status
+          type: integer
+        errorCode:
+          description: Código estável do catálogo de erros.
+          examples:
+          - PROFESSION_NOT_FOUND
+          title: Errorcode
+          type: string
+        detail:
+          description: Explicação para quem depura; o front não exibe.
+          examples:
+          - A profissão não existe no snapshot ativo.
+          title: Detail
+          type: string
+        instance:
+          description: Caminho da requisição.
+          examples:
+          - /feeds/professionals
+          title: Instance
+          type: string
+        timestamp:
+          description: Momento do erro, em UTC.
+          format: date-time
+          title: Timestamp
+          type: string
+        traceId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          description: Id do trace, quando houver.
+          title: Traceid
+        errors:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProblemFieldError'
+            type: array
+          - type: 'null'
+          default: null
+          description: Campos inválidos, só em validação.
+          title: Errors
+      required:
+      - type
+      - title
+      - status
+      - errorCode
+      - detail
+      - instance
+      - timestamp
+      title: ProblemDetail
+      type: object
+  securitySchemes:
+    serviceKey:
+      type: apiKey
+      in: header
+      name: X-Service-Key
+tags:
+- name: Feeds
+  description: Feeds ranqueados para serviços, protegidos pela chave de serviço.
+- name: Feeds públicos
+  description: Amostras abertas dos feeds, sem chave e com cache público.
+- name: Saúde
+  description: Vivo e pronto do serviço, usados pelo Render, pelo GKE e pelo keepalive.
+security:
+- serviceKey: []

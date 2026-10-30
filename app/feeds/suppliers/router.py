@@ -15,14 +15,14 @@ from app.feeds.common import (
 from app.feeds.suppliers.schemas import PublicSupplier, SupplierItem
 from app.feeds.suppliers.service import SuppliersService
 from app.feeds.suppliers.strategies import SupplierStrategy
-from app.security import require_recommendation_key
+from app.security import require_caller
 
 router = APIRouter(
     prefix="/feeds/suppliers",
-    tags=["feeds"],
-    dependencies=[Depends(require_recommendation_key)],
+    tags=["Feeds"],
+    dependencies=[Depends(require_caller("mcp-database"))],
 )
-public_router = APIRouter(prefix="/public/feeds/suppliers", tags=["public-feeds"])
+public_router = APIRouter(prefix="/public/feeds/suppliers", tags=["Feeds públicos"])
 
 
 def get_service(
@@ -32,18 +32,72 @@ def get_service(
     return SuppliersService(graph, postgres)
 
 
-@router.get("", response_model=FeedResponse[SupplierItem])
+@router.get(
+    "",
+    response_model=FeedResponse[SupplierItem],
+    summary="Lista fornecedores ranqueados pela estratégia pedida",
+    description=(
+        "Chamado por serviço (mcp-database) com a chave no cabeçalho X-Service-Key. "
+        "Sem o grafo, responde com source=fallback: uma amostra do PostgreSQL, sem aplicar a estratégia."
+    ),
+    operation_id="getSuppliersFeed",
+    responses={
+        401: {"description": "Chave de serviço ausente ou inválida."},
+        403: {"description": "Serviço chamador não autorizado nesta rota."},
+        404: {"description": "A unidade local não existe no snapshot ativo."},
+        422: {
+            "description": "Parâmetro inválido, unidade sem geolocalização única, estratégia sem local_unit_id ou conjunto elegível acima do limite de ranking."
+        },
+        503: {"description": "Nem o grafo nem o PostgreSQL responderam."},
+    },
+    openapi_extra={
+        "x-error-codes": [
+            "UNAUTHENTICATED",
+            "FORBIDDEN",
+            "VALIDATION_FAILED",
+            "LOCAL_UNIT_REQUIRED",
+            "LOCAL_UNIT_NOT_FOUND",
+            "LOCAL_UNIT_GEO_REQUIRED",
+            "LOCAL_UNIT_GEO_AMBIGUOUS",
+            "CANDIDATE_POOL_TOO_LARGE",
+            "FEED_UNAVAILABLE",
+            "INTERNAL_ERROR",
+        ]
+    },
+)
 async def suppliers_feed(
     service: Annotated[SuppliersService, Depends(get_service)],
-    strategy: Annotated[SupplierStrategy, Query()] = SupplierStrategy.MOST_PROVEN,
-    local_unit_id: Annotated[UUID | None, Query()] = None,
-    company_id: Annotated[UUID | None, Query()] = None,
+    strategy: Annotated[
+        SupplierStrategy, Query(description="Critério de ordenação do feed.")
+    ] = SupplierStrategy.MOST_PROVEN,
+    local_unit_id: Annotated[
+        UUID | None,
+        Query(
+            description="Unidade local de referência para calcular distância; obrigatória na estratégia nearest."
+        ),
+    ] = None,
+    company_id: Annotated[
+        UUID | None, Query(description="Empresa que vê o feed; ainda não influencia o ranking.")
+    ] = None,
 ):
     result = await service.recommend(strategy, local_unit_id)
     return build_response("suppliers", strategy.value, company_id, result)
 
 
-@public_router.get("", response_model=PublicFeedResponse[PublicSupplier])
+@public_router.get(
+    "",
+    response_model=PublicFeedResponse[PublicSupplier],
+    summary="Lista uma amostra pública de fornecedores",
+    description=(
+        "Aberto, sem chave. Nunca consulta o grafo e responde com Cache-Control público "
+        "(e stale-if-error) para a Cloudflare atender os anônimos."
+    ),
+    operation_id="getPublicSuppliersFeed",
+    responses={
+        503: {"description": "O PostgreSQL não respondeu."},
+    },
+    openapi_extra={"security": [], "x-error-codes": ["FEED_UNAVAILABLE", "INTERNAL_ERROR"]},
+)
 async def public_suppliers_feed(
     response: Response,
     service: Annotated[SuppliersService, Depends(get_service)],

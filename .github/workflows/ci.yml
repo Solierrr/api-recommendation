@@ -98,7 +98,7 @@ jobs:
             --entrypoint python \
             --env APP_ENVIRONMENT=test \
             api-recommendation:ci \
-            -c "from app.main import app; paths = app.openapi()['paths']; assert '/health/live' in paths and '/feeds/offers' in paths"
+            -c "from app.main import app; paths = app.openapi()['paths']; assert '/health' in paths and '/ready' in paths and '/feeds/offers' in paths"
 
       - name: Upload coverage
         if: ${{ always() && hashFiles('coverage.xml') != '' }}
