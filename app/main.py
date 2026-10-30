@@ -1,17 +1,17 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app import health
 from app.config import settings
 from app.database import graph_service, postgres_service
-from app.errors import FeedError
 from app.feeds.offers import router as offers
 from app.feeds.professionals import router as professionals
 from app.feeds.suppliers import router as suppliers
+from app.observability.errors import register_error_handlers
+from app.observability.observability import setup_observability
 
 logger = logging.getLogger(__name__)
 logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
@@ -40,6 +40,10 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.DOCS_ENABLED else None,
 )
 
+# ordem fixa: a observabilidade cria o span que os handlers de erro marcam
+setup_observability(app, "api-recommendation")
+register_error_handlers(app)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,28 +52,6 @@ app.add_middleware(
     allow_methods=["GET", "HEAD", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
-
-
-@app.exception_handler(FeedError)
-async def feed_error_handler(request: Request, error: FeedError) -> JSONResponse:
-    return JSONResponse(
-        status_code=error.status_code,
-        content={"detail": {"code": error.code, "message": error.message}},
-    )
-
-
-@app.exception_handler(Exception)
-async def unexpected_error_handler(request: Request, error: Exception) -> JSONResponse:
-    logger.exception("Falha inesperada ao gerar recomendações")
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "detail": {
-                "code": "RECOMMENDATION_FAILED",
-                "message": "Não foi possível gerar a recomendação.",
-            }
-        },
-    )
 
 
 app.include_router(health.router)
