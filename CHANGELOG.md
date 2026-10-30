@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/Solierrr/api-recommendation/compare/v0.3.0...v0.4.0) (2026-10-30)
+
+
+### Features
+
+* add the local run commands ([5d055d3](https://github.com/Solierrr/api-recommendation/commit/5d055d3e62cba55e948a0fc499988abdd8bc5052))
+* allow browser calls to the public feeds with cors ([#54](https://github.com/Solierrr/api-recommendation/issues/54)) ([b234b9d](https://github.com/Solierrr/api-recommendation/commit/b234b9dd83dc89995fc76eb7ab8563f87210899b))
+* standardize the service contract ([#52](https://github.com/Solierrr/api-recommendation/issues/52)) ([27d6d8a](https://github.com/Solierrr/api-recommendation/commit/27d6d8abadc4787ef64a71611fe66f4c5b98835c))
+
+
+### Bug Fixes
+
+* read the offer brand from the brand catalog in the sql fallback ([#49](https://github.com/Solierrr/api-recommendation/issues/49)) ([8615673](https://github.com/Solierrr/api-recommendation/commit/8615673b0d01fd950c5b2e54f3bd59ffd09bbef2))
+
 ## [0.3.0](https://github.com/Solierrr/api-recommendation/compare/v0.2.0...v0.3.0) (2026-10-02)
 
 
