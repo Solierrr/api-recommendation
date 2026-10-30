@@ -17,7 +17,7 @@ precisa do PostgreSQL do `api-core`; o Neo4j é opcional, porque sem ele os feed
   — rodar fora do container exige essa versão instalada na máquina.
 - **Acesso ao PostgreSQL do `api-core`**, obrigatório: o serviço não sobe sem ele
   (`DB_POSTGRES_HOST`, `DB_POSTGRES_PORT`, `DB_POSTGRES_CORE`, `DB_POSTGRES_USER`,
-  `DB_POSTGRES_PASSWORD`). O schema real é o do `database-console/db/core`.
+  `DB_POSTGRES_PASSWORD`). O schema real é o das migrações Flyway do `api-core` (`src/main/resources/db/migration`).
 - **Neo4j `feeddb`, opcional**, preencha `DB_NEO4J_URI`, `DB_NEO4J_USER`, `DB_NEO4J_PASSWORD` e
   `DB_NEO4J_FEED` para ranquear pelo grafo. O grafo é populado pelo job
   [`database-bootstrap`](https://github.com/Solierrr/database-bootstrap); sem ele (ou sem as
@@ -117,8 +117,9 @@ docker run -d --name rec-postgres -p 127.0.0.1:5432:5432 \
   -e POSTGRES_PASSWORD=test-password-for-ci -e POSTGRES_DB=coredb postgres:16
 ```
 
-Carregue o schema do `api-core` com `enums.sql`, `schema.sql` e a migração
-`V10__technician_review_status.sql` do `database-console/db/core` (por exemplo com `psql -f`) e rode:
+Carregue o schema do `api-core` aplicando, em ordem numérica, as migrações `V*.sql` de
+`src/main/resources/db/migration` do repositório `Solierrr/api-core` (branch `qa`) com
+`psql --set ON_ERROR_STOP=1 -f` e rode:
 
 ```Comando dos testes de integração
 INTEGRATION_ALLOW_DESTRUCTIVE=true \

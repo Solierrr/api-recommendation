@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     SERVICE_KEY_MCP_DATABASE: SecretStr | None = None
     # Chave antiga (X-Recommendation-Key), aceita só até o mcp-database enviar X-Service-Key.
     RECOMMENDATION_API_KEY: SecretStr | None = None
-    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     RECOMMENDATION_RESULT_LIMIT: int = Field(default=10, ge=1, le=50)
     RECOMMENDATION_POOL_LIMIT: int = Field(default=500, ge=10, le=5000)
     FALLBACK_POOL_SIZE: int = Field(default=30, ge=1, le=500)
@@ -54,6 +54,10 @@ class Settings(BaseSettings):
         return f"postgresql://{self.DB_POSTGRES_HOST}:{self.DB_POSTGRES_PORT}/{self.DB_POSTGRES_CORE}"
 
     @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    @property
     def graph_configured(self) -> bool:
         return bool(self.DB_NEO4J_URI and self.DB_NEO4J_PASSWORD)
 
@@ -61,10 +65,6 @@ class Settings(BaseSettings):
     def service_keys(self) -> dict[str, str]:
         keys = {"mcp-database": self.SERVICE_KEY_MCP_DATABASE}
         return {caller: key.get_secret_value() for caller, key in keys.items() if key is not None}
-
-    @property
-    def cors_origins(self) -> list[str]:
-        return [origin.strip() for origin in self.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     def validate_runtime_security(self) -> None:
         for caller, key in self.service_keys.items():

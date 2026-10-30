@@ -2,40 +2,40 @@ WITH eligible_technician AS (
     SELECT technician.id AS technician_id
     FROM technician
     JOIN person
-      ON person.id = technician.fk_person
-    JOIN users
-      ON users.id = person.fk_users
-    WHERE users.active IS TRUE
+      ON person.id = technician.person_id
+    JOIN user_account
+      ON user_account.id = person.user_id
+    WHERE user_account.is_active IS TRUE
       AND technician.status = 'APPROVED'
 ),
 registered AS (
     SELECT
-        professional_registration.fk_technician AS technician_id,
+        professional_registration.technician_id AS technician_id,
         ARRAY_AGG(DISTINCT profession.name ORDER BY profession.name) AS professions
     FROM professional_registration
     JOIN profession
-      ON profession.id = professional_registration.fk_profession
+      ON profession.id = professional_registration.profession_id
     WHERE profession.name IS NOT NULL
       AND BTRIM(profession.name) <> ''
       AND (
-          professional_registration.expiration_date IS NULL
-          OR professional_registration.expiration_date >= CURRENT_TIMESTAMP
+          professional_registration.expires_at IS NULL
+          OR professional_registration.expires_at >= CURRENT_TIMESTAMP
       )
-      AND ($3::uuid IS NULL OR professional_registration.fk_profession = $3::uuid)
-    GROUP BY professional_registration.fk_technician
+      AND ($3::uuid IS NULL OR professional_registration.profession_id = $3::uuid)
+    GROUP BY professional_registration.technician_id
 ),
 review_scores AS (
     SELECT
-        fk_professional AS technician_id,
+        technician_id,
         AVG(rating)::double precision AS average_rating,
         COUNT(*)::integer AS review_count
     FROM professional_review
-    WHERE active IS TRUE
-    GROUP BY fk_professional
+    WHERE is_active IS TRUE
+    GROUP BY technician_id
 ),
 service_metrics AS (
     SELECT
-        technician_affiliation.fk_technician AS technician_id,
+        technician_affiliation.technician_id AS technician_id,
         COUNT(DISTINCT technical_service.id)::integer AS assigned_service_count,
         COUNT(DISTINCT technical_service.id) FILTER (
             WHERE technical_service.status = 'COMPLETED'
@@ -45,20 +45,20 @@ service_metrics AS (
         )::integer AS canceled_service_count
     FROM technician_affiliation
     JOIN service_executor
-      ON service_executor.fk_technician_affiliation = technician_affiliation.id
+      ON service_executor.technician_affiliation_id = technician_affiliation.id
     JOIN technical_service
-      ON technical_service.id = service_executor.fk_service
-    GROUP BY technician_affiliation.fk_technician
+      ON technical_service.id = service_executor.technical_service_id
+    GROUP BY technician_affiliation.technician_id
 ),
 valid_certifications AS (
     SELECT
-        fk_technician AS technician_id,
+        technician_id,
         COUNT(*)::integer AS valid_certification_count,
         ARRAY_AGG(DISTINCT type ORDER BY type) AS certification_names
     FROM certification
-    WHERE validity IS NULL
-       OR validity >= CURRENT_TIMESTAMP
-    GROUP BY fk_technician
+    WHERE valid_until_at IS NULL
+       OR valid_until_at >= CURRENT_TIMESTAMP
+    GROUP BY technician_id
 ),
 top_rated AS (
     SELECT
