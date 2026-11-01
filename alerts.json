@@ -1,0 +1,8 @@
+{
+  "service": "api-recommendation",
+  "aliases": [
+    "recommendation"
+  ],
+  "project": "DEV",
+  "host": "https://recommendation.solarianetwork.site"
+}
