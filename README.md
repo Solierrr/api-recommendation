@@ -1,73 +1,41 @@
-# api-recommendation
+<p align="center">
+  <img src="./assets/readme/banners/fastapi.png" alt="FastAPI" width="100%">
+</p>
 
-O `api-recommendation` é o motor de feeds da plataforma: recomenda profissionais, ofertas de placas
-solares e fornecedores para as três telas de feed do marketplace. O ranking vem de um grafo no
-Neo4j (`feeddb`), que é uma projeção descartável do PostgreSQL do `api-core`, reconstruída pelo
-job [`database-bootstrap`](https://github.com/Solierrr/database-bootstrap). Este serviço só lê o
-grafo: ele não sincroniza, não escreve e não depende do Neo4j para funcionar. Quando o grafo está
-indisponível, ou não está configurado (como no QA), ele responde com uma amostra dos itens
-elegíveis lida direto do PostgreSQL.
+<p align="center">
+  <img src="./assets/readme/stacks/python.png" width="100" hspace="8" alt="Python" title="Python">
+  <img src="./assets/readme/stacks/neo4j.png" width="100" hspace="8" alt="Neo4j" title="Neo4j">
+  <img src="./assets/readme/stacks/postgresql.png" width="100" hspace="8" alt="PostgreSQL" title="PostgreSQL">
+  <img src="./assets/readme/stacks/swagger.png" width="100" hspace="8" alt="Swagger" title="Swagger">
+  <img src="./assets/readme/stacks/bruno.png" width="100" hspace="8" alt="Bruno" title="Bruno">
+</p>
 
-<p>
+# Feeds de recomendações
 
 [![License](https://img.shields.io/github/license/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/blob/main/LICENSE)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/commits)
-[![GitHub Issues](https://img.shields.io/github/issues/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/pulls)
-[![GitHub Contributors](https://img.shields.io/github/contributors/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/graphs/contributors)
 [![Release](https://img.shields.io/github/v/release/Solierrr/api-recommendation)](https://github.com/Solierrr/api-recommendation/releases)
 
-</p>
+Este serviço recomenda profissionais, ofertas de placas solares e fornecedores para apoiar a escolha de quem contrata e compra na plataforma. Cada lista apresenta motivos e métricas de ordenação. A pessoa pode comparar alternativas por avaliação, experiência, preço, eficiência ou proximidade, conforme o tipo de recomendação disponível.
 
-<div align="center">
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,pydantic,neo4j,postgresql,docker" height="48" alt="Stack do Projeto">
-  </a>
-</p>
-
-<p>
-
-[![Python](https://img.shields.io/badge/Python_3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Pydantic](https://img.shields.io/badge/Pydantic-E92063?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
-[![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?logo=neo4j&logoColor=white)](https://neo4j.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-
-</p>
-
-</div>
-
-- **Três feeds**, `GET /feeds/professionals`, `GET /feeds/offers` e `GET /feeds/suppliers` devolvem
-  os itens ranqueados por uma estratégia (`strategy`) e aceitam `company_id` e, quando faz sentido,
-  `profession_id` ou `local_unit_id`. Exigem a chave de serviço do chamador no header
-  `X-Service-Key` (hoje só o `mcp-database`); a chave não pode ir para o navegador.
-- **Feeds públicos**, `GET /public/feeds/{professionals|offers|suppliers}` não exigem chave, nunca
-  tocam o Neo4j e respondem com `Cache-Control: public` (e `stale-if-error`) para que a Cloudflare
-  atenda os anônimos sem chegar à origem.
-  O navegador só os lê a partir das origens de `CORS_ALLOWED_ORIGINS` (lista separada por vírgula,
-  sem credenciais e sem `*`); o header `X-Recommendation-Key` não é aceito em chamadas CORS. Com a
-  Cloudflare na frente, use uma única origem por ambiente ou inclua `Origin` na chave de cache.
-- **Fallback SQL**, quando o grafo está fora do ar, sem snapshot ou não configurado, os feeds
-  autenticados respondem com `source: "fallback"` em vez de erro: uma amostra aleatória entre os
-  melhores itens elegíveis lidos do PostgreSQL, sem aplicar a estratégia pedida.
-- **Somente leitura**, o serviço não escreve no Neo4j nem no PostgreSQL. O grafo é construído pelo
-  `database-bootstrap`, e o contrato entre os dois está documentado na spec do projeto.
-- **Saúde sem reinício em cascata**, `/health` não depende de nada e `/ready` só responde `DOWN`
-  (503) quando o PostgreSQL cai; o grafo fica de fora, porque sem ele os feeds usam o fallback SQL.
-- **Contrato padronizado**, Swagger em `/docs` e contrato em `/openapi.json` (desligados em PROD por
-  `DOCS_ENABLED=false`), erros em `application/problem+json` e o contrato exportado em `openapi.yaml`
-  por `make openapi`.
+As recomendações usam um retrato dos dados de negócio no Neo4j. Quando ele não está disponível, o serviço consulta uma amostra de itens elegíveis no PostgreSQL e informa essa origem. As listas públicas usam apenas essa alternativa. O serviço lê os dados e não altera o cadastro ou reconstrói o grafo.
 
 ## Aprofunde-se no Projeto!
 
-- [ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-- [RUNNING.md](./docs/RUNNING.md)
+- [OVERVIEW.md](./docs/OVERVIEW.md), finalidade e regras de produto.
+- [ARCHITECTURE.md](./docs/ARCHITECTURE.md), componentes, dados e integrações.
+- [RUNNING.md](./docs/RUNNING.md), preparação e execução local.
+- [API.md](./docs/API.md), autenticação e uso do contrato.
+- [FEEDS.md](./docs/FEEDS.md), detalhes do fluxo ou modelo de dados.
+- [DEPLOY.md](./docs/DEPLOY.md), ambientes e publicação.
+- [STATUS.md](./docs/STATUS.md), limites observados.
+- [Dados](./database/), modelos e responsabilidades de persistência.
+- [Fluxos](./flows/), etapas e casos de erro do repositório.
+- [PENDENCIAS.md](./PENDENCIAS.md), questões para revisão.
 
 ## Contribuindo
 
-- [CONTRIBUTING.md](./CONTRIBUTING.md), convenções de commit, branch e Pull Request.
-- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), código de conduta do projeto.
-- [SECURITY.md](./SECURITY.md), como reportar vulnerabilidades de segurança.
+- [CONTRIBUTING.md](https://github.com/Solierrr/.github/blob/main/.github/CONTRIBUTING.md), convenções de contribuição.
+- [CODE_OF_CONDUCT.md](https://github.com/Solierrr/.github/blob/main/CODE_OF_CONDUCT.md), código de conduta.
+- [SECURITY.md](https://github.com/Solierrr/.github/blob/main/SECURITY.md), relato de vulnerabilidades.
