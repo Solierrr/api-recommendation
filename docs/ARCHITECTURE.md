@@ -1,94 +1,28 @@
-# Arquitetura do Repositório
-
-O `api-recommendation` é organizado por domínio, e não por camada técnica: cada feed
-(`professionals`, `offers`, `suppliers`) é um pacote em `app/feeds/` com tudo o que precisa (rota,
-serviço, estratégias de ranking, modelos de resposta e as consultas em arquivos `.cypher` e
-`.sql`). O que é comum a todos os feeds (configuração, autenticação, conexões, tratamento de erros
-e utilitários de ranking) fica na raiz de `app/`. O serviço é somente leitura e tem duas fontes:
-o Neo4j `feeddb`, uma projeção descartável do `api-core` construída pelo job `database-bootstrap`,
-e o PostgreSQL do `api-core`, usado como rede de segurança quando o grafo não responde.
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,neo4j,postgresql,docker" height="48" alt="Arquitetura">
-  </a>
+<p align="center">
+  <img src="../assets/readme/banners/fastapi.png" alt="FastAPI" width="100%">
 </p>
 
-- **Um pacote por feed**, `app/feeds/<feed>/` tem `router.py` (rota autenticada e rota pública),
-  `service.py` (decide entre o grafo e o fallback), `strategies.py` (ranking puro, sem I/O),
-  `schemas.py` (modelos de resposta), `candidates.cypher` e `fallback.sql`. Adicionar um feed é
-  adicionar um pacote e registrar os dois routers em `app/main.py`.
-- **Grafo primeiro, SQL como rede de segurança**, cada serviço tenta o grafo e, se o Neo4j não está
-  configurado, está fora do ar ou não tem snapshot ativo (`GraphUnavailableError`), cai no
-  `fallback.sql` e devolve `source: "fallback"` com um aviso. Erros de domínio (contexto inexistente,
-  dado insuficiente) nunca disparam o fallback: viram `404` ou `422`. Se nem o PostgreSQL responde,
-  a resposta é `503` com o código `FEED_UNAVAILABLE`.
-- **Neo4j tolerante**, `GraphService` (`app/database.py`) nunca derruba a aplicação: sem
-  `DB_NEO4J_URI` ele fica desligado (é o caso do QA no Render, que sempre usa o fallback), e uma
-  falha de conexão abre um período de espera (`GRAPH_RETRY_AFTER_SECONDS`) em que as requisições
-  vão direto ao SQL, sem pagar o timeout de novo.
-- **Somente o snapshot ativo**, as consultas Cypher leem apenas nós com `source = "api-core"` e
-  `sync_version` igual ao `SyncState.active_version`, então uma reconstrução em andamento nunca
-  aparece pela metade. Esse formato é o contrato com o `database-bootstrap`.
-- **Fallback amostral**, cada `fallback.sql` seleciona os `FALLBACK_POOL_SIZE` melhores itens
-  elegíveis e sorteia `RECOMMENDATION_RESULT_LIMIT` entre eles, para o feed rotacionar. A regra de
-  elegibilidade (modelo aprovado, fornecedor ativo com assinatura paga, técnico aprovado de usuário
-  ativo) é a mesma do grafo e fica documentada no contrato do `database-bootstrap`.
-- **Feeds públicos sanitizados**, `/public/feeds/*` usam modelos próprios, só com campos que podem
-  ser expostos a anônimos, e sempre são servidos pelo SQL. As respostas carregam
-  `Cache-Control: public, max-age=…, stale-if-error=…`.
-- **Chave de serviço por chamador**, `X-Service-Key` (`app/security.py`), comparada com
-  `hmac.compare_digest` contra `SERVICE_KEY_<CHAMADOR>`; cada rota declara os chamadores aceitos
-  (`require_caller`), com 401 para chave ausente ou inválida e 403 para chamador não aceito. Sem
-  nenhuma chave configurada, tudo é recusado. Durante a troca, o header antigo
-  `X-Recommendation-Key` (`RECOMMENDATION_API_KEY`) ainda identifica o `mcp-database`.
-  `Settings.validate_runtime_security()` recusa a partida com chave de serviço fora de 32 a 512
-  caracteres e, em produção, exige uma chave, `sslmode` seguro no PostgreSQL e Swagger desligado.
-- **Erros no contrato da organização**, `app/errors.py` responde todo erro em
-  `application/problem+json` (`type`, `title`, `status`, `errorCode`, `detail`, `instance`,
-  `timestamp`); `app/openapi.py` monta o contrato, aplica o `ProblemDetail` às respostas de erro e
-  remove as rotas `/internal/` do que é servido em `/openapi.json`. O Neo4j do cluster é acessado
-  por `bolt://` interno, sem TLS.
-- **Segurança do container**, o `Dockerfile` usa `python:3.12-slim`, usuário não-root e instala as
-  dependências com `--require-hashes` a partir do `requirements.lock`.
+# Arquitetura
 
-```Tree do Repositório
-├── .github/
-│   └── workflows/
-├── app/
-│   ├── feeds/
-│   │   ├── professionals/        # router, service, strategies, schemas, candidates.cypher, fallback.sql
-│   │   ├── offers/               # idem
-│   │   ├── suppliers/            # idem
-│   │   ├── active_version.cypher # snapshot ativo (versão e idade)
-│   │   ├── local_unit.cypher     # contexto geográfico
-│   │   ├── common.py             # respostas, ranking, haversine, orquestração grafo/fallback
-│   │   ├── fallback.py           # execução do SQL e formatação dos itens do fallback
-│   │   └── graph.py              # leitura do snapshot ativo
-│   ├── config.py                 # Configurações (variáveis de ambiente)
-│   ├── database.py               # PostgresService e GraphService
-│   ├── dependencies.py           # Injeção dos serviços de banco
-│   ├── errors.py                 # ProblemDetail e handlers de erro
-│   ├── health.py                 # /health e /ready
-│   ├── main.py                   # Ponto de entrada (lifespan, routers, CORS, metadados do contrato)
-│   ├── openapi.py                # Montagem do contrato OpenAPI
-│   ├── queries.py                # Leitura dos arquivos .cypher e .sql
-│   ├── security.py               # X-Service-Key por chamador
-│   └── version.py                # Versão lida do version.txt
-├── http/                         # Coleção Bruno
-├── scripts/
-│   └── export_openapi.py         # Gera o openapi.yaml (make openapi)
-├── tests/
-│   ├── unit/
-│   └── integration/              # Neo4j e PostgreSQL reais (opt-in)
-├── Dockerfile
-├── openapi.yaml                  # Contrato exportado, conferido no CI
-├── pyproject.toml                # Configuração de ruff, coverage e mypy
-├── pytest.ini
-├── requirements.txt
-├── requirements-dev.txt
-├── requirements.lock
-├── requirements-ci.lock
-├── sonar-project.properties
-└── version.txt                   # Versão do release, mantida pelo release-please
+A aplicação FastAPI separa rotas, schemas, estratégias e consultas por domínio em `app/feeds/`. O [código comum](https://github.com/Solierrr/api-recommendation/blob/main/app/feeds/common.py) limita candidatos e faz fallback apenas quando recebe `GraphUnavailableError`.
+
+```mermaid
+flowchart LR
+ C[mcp-database] -->|HTTP e X-Service-Key| A[FastAPI]
+ N[Navegador] -->|HTTP público| A
+ A --> S[Serviços e estratégias]
+ S --> G[(Neo4j)]
+ S --> P[(PostgreSQL)]
+ B[database-bootstrap] -->|Produz snapshots| G
 ```
+
+| Integração | Acesso |
+|---|---|
+| `mcp-database` | `/feeds/*` com `X-Service-Key` |
+| Navegador | `/public/feeds/*`, sem chave e com CORS configurável |
+| Neo4j | Leitura Bolt pelo driver, credenciais de banco |
+| PostgreSQL | Leitura SQL, credenciais e modo SSL configuráveis |
+
+Os clientes de dados ficam em `app/database.py` e as consultas Cypher e SQL ficam junto dos domínios, com o snapshot escolhido por `SyncState.active_version`. A alternativa sem grafo não vale para toda exceção de negócio, porque um contexto inválido precisa ser informado ao chamador.
+
+O `/health` informa a versão lida de `version.txt`, e o `/ready` testa somente o PostgreSQL, com limite de dois segundos, de modo que a ausência do grafo não tira o serviço da prontidão. O modelo consumido está em [NEO4J.md](../database/NEO4J.md).
