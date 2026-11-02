@@ -32,7 +32,6 @@ As recomendações usam um retrato dos dados de negócio no Neo4j. Quando ele n�
 - [STATUS.md](./docs/STATUS.md), limites observados.
 - [Dados](./database/), modelos e responsabilidades de persistência.
 - [Fluxos](./flows/), etapas e casos de erro do repositório.
-- [PENDENCIAS.md](./PENDENCIAS.md), questões para revisão.
 
 ## Contribuindo
 
