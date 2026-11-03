@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/Solierrr/api-recommendation/compare/v0.4.0...v0.5.0) (2026-11-02)
+
+
+### Features
+
+* describe the service for the alerts routing ([4bbe40f](https://github.com/Solierrr/api-recommendation/commit/4bbe40f540a46b2677120861cda61a31dc980768))
+
 ## [0.4.0](https://github.com/Solierrr/api-recommendation/compare/v0.3.0...v0.4.0) (2026-10-30)
 
 
