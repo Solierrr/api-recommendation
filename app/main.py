@@ -11,6 +11,7 @@ from app.errors import register_error_handlers
 from app.feeds.offers import router as offers
 from app.feeds.professionals import router as professionals
 from app.feeds.suppliers import router as suppliers
+from app.observability.observability import setup_observability
 from app.openapi import install_openapi
 from app.version import VERSION
 
@@ -72,6 +73,9 @@ app = FastAPI(
         "operationsSorter": "alpha",
     },
 )
+
+# ordem fixa: a observabilidade cria o span que os handlers de erro marcam
+setup_observability(app, "api-recommendation")
 
 app.add_middleware(
     CORSMiddleware,
